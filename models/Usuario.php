@@ -3,8 +3,6 @@
 class Usuario
 {
     private $conn;
-
-    // CAMBIADO A LA TABLA persona
     private $tabla = "persona";
 
     public function __construct($db)
@@ -12,119 +10,107 @@ class Usuario
         $this->conn = $db;
     }
 
-    // Verificar si existe documento
-    public function existeCorreo($documento)
+    // Verificar si existe correo
+    public function existeCorreo($correo)
     {
-        $sql = "SELECT id_persona
-                FROM {$this->tabla}
-                WHERE documento = :documento
-                LIMIT 1";
-
-        $stmt = $this->conn->prepare($sql);
-
-        $stmt->execute([
-            ':documento' => $documento
-        ]);
-
+        $stmt = $this->conn->prepare(
+            "SELECT id_persona FROM {$this->tabla} WHERE correo = :correo LIMIT 1"
+        );
+        $stmt->execute([':correo' => $correo]);
         return $stmt->rowCount() > 0;
     }
 
-    // Verificar documento o telefono
-    public function existeCorreoTelefono($documento, $telefono)
+    // Verificar correo o telefono (para registro)
+    public function existeCorreoTelefono($correo, $telefono)
     {
-        $sql = "SELECT id_persona
-                FROM {$this->tabla}
-                WHERE documento = :documento
-                OR telefono = :telefono
-                LIMIT 1";
-
-        $stmt = $this->conn->prepare($sql);
-
-        $stmt->execute([
-            ':documento' => $documento,
-            ':telefono'  => $telefono
-        ]);
-
+        $stmt = $this->conn->prepare(
+            "SELECT id_persona FROM {$this->tabla}
+             WHERE correo = :correo OR telefono = :telefono LIMIT 1"
+        );
+        $stmt->execute([':correo' => $correo, ':telefono' => $telefono]);
         return $stmt->rowCount() > 0;
     }
 
-    // Obtener usuario por documento
-    public function obtenerPorEmail($documento)
+    // Obtener usuario por correo (login)
+    public function obtenerPorEmail($correo)
     {
-        $sql = "SELECT *
-                FROM {$this->tabla}
-                WHERE documento = :documento
-                LIMIT 1";
-
-        $stmt = $this->conn->prepare($sql);
-
-        $stmt->execute([
-            ':documento' => $documento
-        ]);
-
+        $stmt = $this->conn->prepare(
+            "SELECT * FROM {$this->tabla} WHERE correo = :correo LIMIT 1"
+        );
+        $stmt->execute([':correo' => $correo]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    // Validar identidad para recuperación — acepta correo O teléfono
+    public function validarRecuperacion($valor, $metodo = 'correo')
+    {
+        $campo = $metodo === 'telefono' ? 'telefono' : 'correo';
+        $stmt  = $this->conn->prepare(
+            "SELECT id_persona FROM {$this->tabla}
+             WHERE {$campo} = :valor AND activo = 1 LIMIT 1"
+        );
+        $stmt->execute([':valor' => $valor]);
+        return $stmt->rowCount() > 0;
+    }
+
+    // Actualizar contraseña — busca por correo O teléfono
+    public function actualizarPassword($valor, $nuevaPasswordHash, $metodo = 'correo')
+    {
+        $campo = $metodo === 'telefono' ? 'telefono' : 'correo';
+        $stmt  = $this->conn->prepare(
+            "UPDATE {$this->tabla}
+             SET `contraseña` = :password,
+                 intentos_fallidos = 0,
+                 bloqueado_hasta = NULL
+             WHERE {$campo} = :valor"
+        );
+        return $stmt->execute([':password' => $nuevaPasswordHash, ':valor' => $valor]);
     }
 
     // Registrar intento fallido
     public function registrarIntentoFallido($id)
     {
-        $sql = "UPDATE {$this->tabla}
-                SET intentos_fallidos = IFNULL(intentos_fallidos, 0) + 1,
-                    bloqueado_hasta = IF(IFNULL(intentos_fallidos, 0) + 1 >= 5, DATE_ADD(NOW(), INTERVAL 15 MINUTE), bloqueado_hasta)
-                WHERE id_persona = :id";
-        
-        $stmt = $this->conn->prepare($sql);
+        $stmt = $this->conn->prepare(
+            "UPDATE {$this->tabla}
+             SET intentos_fallidos = IFNULL(intentos_fallidos, 0) + 1,
+                 bloqueado_hasta = IF(
+                     IFNULL(intentos_fallidos, 0) + 1 >= 5,
+                     DATE_ADD(NOW(), INTERVAL 15 MINUTE),
+                     bloqueado_hasta
+                 )
+             WHERE id_persona = :id"
+        );
         $stmt->execute([':id' => $id]);
     }
 
-    // Resetear intentos
+    // Resetear intentos fallidos
     public function resetearIntentos($id)
     {
-        $sql = "UPDATE {$this->tabla} 
-                SET intentos_fallidos = 0, 
-                    bloqueado_hasta = NULL 
-                WHERE id_persona = :id";
-                
-        $stmt = $this->conn->prepare($sql);
+        $stmt = $this->conn->prepare(
+            "UPDATE {$this->tabla}
+             SET intentos_fallidos = 0, bloqueado_hasta = NULL
+             WHERE id_persona = :id"
+        );
         $stmt->execute([':id' => $id]);
     }
 
-    // Registrar usuario
+    // Registrar nuevo usuario (cliente)
     public function registrar($datos)
     {
         try {
-
-            $sql = "INSERT INTO {$this->tabla}
-                    (
-                        nombre,
-                        contraseña,
-                        documento,
-                        telefono,
-                        id_rol
-                    )
-                    VALUES
-                    (
-                        :nombre,
-                        :password,
-                        :documento,
-                        :telefono,
-                        :id_rol
-                    )";
-
-            $stmt = $this->conn->prepare($sql);
-
+            $stmt = $this->conn->prepare(
+                "INSERT INTO {$this->tabla} (nombre, `contraseña`, correo, telefono, id_rol)
+                 VALUES (:nombre, :password, :correo, :telefono, :id_rol)"
+            );
             $stmt->execute([
-                ':nombre'     => $datos['nombre'],
-                ':password'   => $datos['password'],
-                ':documento'  => $datos['documento'],
-                ':telefono'   => $datos['telefono'],
-                ':id_rol'     => 2
+                ':nombre'   => $datos['nombre'],
+                ':password' => $datos['password'],
+                ':correo'   => $datos['correo'],
+                ':telefono' => $datos['telefono'],
+                ':id_rol'   => 2,
             ]);
-
             return true;
-
         } catch (Exception $e) {
-
             return "Error al registrar: " . $e->getMessage();
         }
     }
@@ -132,26 +118,53 @@ class Usuario
     // Obtener usuario por ID
     public function obtenerPorId($id)
     {
-        $sql = "SELECT *
-                FROM {$this->tabla}
-                WHERE id_persona = :id
-                LIMIT 1";
-
-        $stmt = $this->conn->prepare($sql);
-
-        $stmt->execute([
-            ':id' => $id
-        ]);
-
+        $stmt = $this->conn->prepare(
+            "SELECT * FROM {$this->tabla} WHERE id_persona = :id LIMIT 1"
+        );
+        $stmt->execute([':id' => $id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
+
+    // Obtener todos los usuarios (con filtro opcional por rol)
+    public function obtenerTodos($rol = null)
+    {
+        if ($rol) {
+            $idRol = match($rol) {
+                'administrador' => 1,
+                'cliente'       => 2,
+                'empleado'      => 3,
+                default         => 2,
+            };
+            $stmt = $this->conn->prepare(
+                "SELECT p.*, r.nombre_rol AS rol_nombre
+                 FROM {$this->tabla} p
+                 JOIN roles r ON p.id_rol = r.id_rol
+                 WHERE p.id_rol = :id_rol
+                 ORDER BY p.nombre"
+            );
+            $stmt->execute([':id_rol' => $idRol]);
+        } else {
+            $stmt = $this->conn->query(
+                "SELECT p.*, r.nombre_rol AS rol_nombre
+                 FROM {$this->tabla} p
+                 JOIN roles r ON p.id_rol = r.id_rol
+                 ORDER BY p.nombre"
+            );
+        }
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Contar usuarios por rol
     public function contarPorRol($rolNombre)
     {
-        $idRol = 2; // Default a cliente
-        if ($rolNombre === 'empleado') $idRol = 3;
-        if ($rolNombre === 'administrador') $idRol = 1;
-
-        $stmt = $this->conn->prepare("SELECT COUNT(*) FROM {$this->tabla} WHERE id_rol = :id_rol");
+        $idRol = match($rolNombre) {
+            'administrador' => 1,
+            'empleado'      => 3,
+            default         => 2,
+        };
+        $stmt = $this->conn->prepare(
+            "SELECT COUNT(*) FROM {$this->tabla} WHERE id_rol = :id_rol"
+        );
         $stmt->execute([':id_rol' => $idRol]);
         return $stmt->fetchColumn();
     }

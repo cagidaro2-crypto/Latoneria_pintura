@@ -1,80 +1,105 @@
-# TallerPro – Sistema de Gestión para Taller de Latonería y Pintura
+# TallerPro — Sistema de Gestión de Taller de Latonería y Pintura
 
-Sistema PHP + Bootstrap 5 con arquitectura MVC, desarrollado según las Historias de Usuario TDLP-001 a TDLP-020.
+[![PHP](https://img.shields.io/badge/PHP-8.1+-blue)](https://php.net)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-orange)](https://mysql.com)
+[![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-purple)](https://getbootstrap.com)
+
+Sistema web integral para la gestión de un taller de latonería y pintura automotriz.
+
+---
+
+## Módulos del Sistema
+
+| Módulo | Admin | Empleado | Cliente |
+|---|:---:|:---:|:---:|
+| Dashboard en tiempo real | ✅ | ✅ | ✅ |
+| Gestión de Usuarios | ✅ | — | — |
+| Gestión de Clientes | ✅ | — | — |
+| Vehículos | ✅ | ✅ | ✅ |
+| Órdenes de Trabajo | ✅ | ✅ | — |
+| Cotizaciones | ✅ | — | ✅ (ver) |
+| Facturación | ✅ | ✅ (ver) | — |
+| Inventario | ✅ | — | — |
+| Citas (calendario) | ✅ | ✅ | ✅ |
+| Reportes | ✅ | — | — |
+| Ventas | ✅ | ✅ | — |
+| Proveedores | ✅ | — | — |
+
+---
+
+## Instalación
+
+### Requisitos
+- Laragon (Apache + PHP 8.1+ + MySQL 8.0)
+- Navegador moderno
+
+### Pasos
+
+1. **Clonar/copiar** el proyecto en `C:\laragon\www\systemTaller`
+
+2. **Importar la base de datos** en HeidiSQL:
+   ```
+   Archivo → Ejecutar archivo SQL → database/latoneria_pintura_completo.sql
+   ```
+
+3. **Si ya tienes datos** (migración sin pérdida):
+   ```
+   Archivo → Ejecutar archivo SQL → database/migracion_segura.sql
+   ```
+
+4. **Verificar configuración** en `config/database.php`:
+   ```php
+   private $host     = "127.0.0.1";
+   private $db_name  = "latoneria_pintura";
+   private $username = "root";
+   private $password = "";
+   ```
+
+5. **Acceder** en el navegador:
+   ```
+   http://127.0.0.1/SystemTaller/views/usuarios/login.php
+   ```
+
+### Credenciales por defecto
+| Rol | Correo | Contraseña |
+|---|---|---|
+| Administrador | admin@taller.com | Admin1234! |
+
+---
 
 ## Estructura del Proyecto
 
 ```
 systemTaller/
-├── config/
-│   └── database.php                 # Conexión PDO MySQL
-├── controllers/
-│   ├── AuthController.php           # Login, registro, logout (TDLP-001, 002, 004)
-│   ├── AdminUsuarioController.php   # CRUD empleados/clientes (TDLP-003)
-│   ├── AdminOrdenController.php     # Órdenes de servicio (TDLP-012)
-│   ├── AdminInventarioController.php# Inventario (TDLP-013)
-│   └── ClienteCitaController.php    # Agenda de citas (TDLP-020)
-├── models/
-│   ├── Usuario.php                  # Modelo de usuarios
-│   ├── Vehiculo.php                 # Modelo de vehículos (TDLP-005)
-│   └── OrdenServicio.php            # Órdenes + historial (TDLP-008)
+├── config/           # Conexión a BD
+├── controllers/      # Lógica de negocio
+├── models/           # Acceso a datos
 ├── views/
-│   ├── layouts/
-│   │   ├── header.php               # Sidebar + topbar (Bootstrap)
-│   │   └── footer.php
-│   ├── usuarios/
-│   │   ├── login.php                # (TDLP-001)
-│   │   └── registre.php             # (TDLP-004)
-│   └── dashboard/
-│       ├── admin_dashboard.php      # Panel administrador
-│       ├── admin_usuarios.php       # Gestión usuarios (TDLP-003)
-│       ├── admin_ordenes.php        # Órdenes de servicio (TDLP-008, 012)
-│       ├── admin_inventario.php     # Inventario (TDLP-013)
-│       ├── admin_reportes.php       # Reportes (TDLP-016)
-│       ├── cliente_dashboard.php    # Panel cliente
-│       ├── cliente_citas.php        # Citas (TDLP-020)
-│       └── empleado_dashboard.php   # Panel empleado
-├── public/
-│   └── index.php                    # Landing page
-└── sql/
-    └── bdtaller.sql                 # Script BD completo
+│   ├── dashboard/    # Vistas por rol
+│   ├── layouts/      # Header y footer compartidos
+│   └── usuarios/     # Login, registro, recuperar
+├── public/           # CSS y assets
+├── database/         # Scripts SQL
+└── documentacion/    # SRS, UML, Backend docs
 ```
 
-## Instalación
+---
 
-1. **Base de datos**: Ejecutar `sql/bdtaller.sql` en MySQL/MariaDB.
-2. **Configurar conexión**: Editar `config/database.php` con tus credenciales.
-3. **Servidor**: Apuntar el DocumentRoot a la carpeta `systemTaller/`.
-4. **Acceso inicial**: `admin@taller.com` / `password` (cambiar inmediatamente).
+## Documentación
 
-## Historias de Usuario Cubiertas
+| Documento | Archivo |
+|---|---|
+| Especificación de Requisitos (SRS) | `documentacion/SRS.md` |
+| Diagramas UML | `documentacion/UML.md` |
+| Documentación Backend | `documentacion/BACKEND.md` |
 
-| ID       | Funcionalidad                          | Módulo                            |
-|----------|----------------------------------------|-----------------------------------|
-| TDLP-001 | Inicio de sesión / Cierre de sesión    | AuthController + login.php        |
-| TDLP-002 | Recuperar contraseña                   | AuthController                    |
-| TDLP-003 | Gestión de empleados y clientes        | AdminUsuarioController            |
-| TDLP-004 | Registro de clientes                   | AuthController (registro)         |
-| TDLP-005 | Registro de vehículos                  | Vehiculo model                    |
-| TDLP-006 | Historial de cliente                   | OrdenServicio model               |
-| TDLP-007 | Historial de vehículo                  | Vehiculo::historialServicios      |
-| TDLP-008 | Seguimiento estado vehículo            | admin_ordenes.php + controller    |
-| TDLP-009 | Evidencias fotográficas                | (estructura SQL lista)            |
-| TDLP-010 | Cotizaciones y facturación             | (estructura SQL lista)            |
-| TDLP-011 | Aprobar/rechazar cotización            | (estructura SQL lista)            |
-| TDLP-012 | Crear orden de servicio                | AdminOrdenController              |
-| TDLP-013 | Gestión de inventario                  | AdminInventarioController         |
-| TDLP-014 | Notificaciones a clientes              | (tabla notificaciones lista)      |
-| TDLP-015 | Consulta estado vehículo               | cliente_ordenes (estructura)      |
-| TDLP-016 | Reportes productividad/ingresos        | admin_reportes.php                |
-| TDLP-017 | Catálogo de productos                  | (tabla productos lista)           |
-| TDLP-018 | Registro de ventas                     | (tabla ventas lista)              |
-| TDLP-019 | Gestión de proveedores                 | (tabla proveedores lista)         |
-| TDLP-020 | Agenda de citas                        | ClienteCitaController + citas.php |
+---
 
 ## Tecnologías
 
-- **Backend**: PHP 8+ con PDO y patrón MVC
-- **Frontend**: Bootstrap 5.3 + Font Awesome 6.5 + SweetAlert2
-- **BD**: MySQL 8 / MariaDB
-- **Colores**: Azul (#1a3a6b, #2563eb), Gris, Blanco
+- **Backend:** PHP 8.1+ (MVC manual, PDO)
+- **Base de datos:** MySQL 8.0
+- **Frontend:** Bootstrap 5.3, FontAwesome 6.5, SweetAlert2
+- **Gráficas:** Chart.js
+- **Calendario:** FullCalendar 6.1
+- **Servidor local:** Laragon (Apache)

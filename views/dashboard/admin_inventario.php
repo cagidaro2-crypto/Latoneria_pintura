@@ -1,6 +1,12 @@
 <?php
 $titulo = 'Gestión de Inventario';
 require_once __DIR__ . '/../../config/database.php';
+
+if (session_status() === PHP_SESSION_NONE) session_start();
+if (!isset($_SESSION['usuario']) || (int)($_SESSION['usuario']['rol'] ?? 0) !== 1) {
+    header("Location: ../usuarios/login.php"); exit;
+}
+
 require_once __DIR__ . '/../layouts/header.php';
 
 $db    = (new Database())->conectar();

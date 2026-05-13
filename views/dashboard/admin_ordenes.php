@@ -4,18 +4,42 @@ require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../models/Usuario.php';
 require_once __DIR__ . '/../../models/Vehiculo.php';
 require_once __DIR__ . '/../../models/OrdenServicio.php';
+
+if (session_status() === PHP_SESSION_NONE) session_start();
+if (!isset($_SESSION['usuario']) || !in_array((int)($_SESSION['usuario']['rol'] ?? 0), [1, 3])) {
+    header("Location: ../usuarios/login.php"); exit;
+}
+
 require_once __DIR__ . '/../layouts/header.php';
 
 $db     = (new Database())->conectar();
 $oModel = new OrdenServicio($db);
-$vModel = new Vehiculo($db);
 $uModel = new Usuario($db);
 $alert  = $_SESSION['alert'] ?? null; unset($_SESSION['alert']);
 
 $ordenes   = $oModel->obtenerTodas();
 $clientes  = $uModel->obtenerTodos('cliente');
-$empleados = $uModel->obtenerTodos('empleado');
-$vehiculos = $vModel->obtenerTodos();
+
+// Empleados: todos los que tienen id_rol=3 en persona, con o sin registro en tabla empleado
+$stmtEmp = $db->query(
+    "SELECT p.id_persona, p.nombre, p.telefono,
+            e.id_empleado
+     FROM persona p
+     LEFT JOIN empleado e ON e.id_persona = p.id_persona
+     WHERE p.id_rol = 3 AND p.activo = 1
+     ORDER BY p.nombre ASC"
+);
+$empleados = $stmtEmp->fetchAll(PDO::FETCH_ASSOC);
+
+// Vehículos con nombre del dueño: vehiculo → cliente
+$stmtVeh = $db->query(
+    "SELECT v.id_vehiculo, v.placa, v.marca, v.modelo, v.`año`,
+            cl.nombre AS nombre_dueno
+     FROM vehiculo v
+     JOIN cliente cl ON v.id_cliente = cl.id_cliente
+     ORDER BY v.placa ASC"
+);
+$vehiculos = $stmtVeh->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -107,8 +131,8 @@ $vehiculos = $vModel->obtenerTodos();
                             <select name="id_cliente" class="form-select" required>
                                 <option value="">Seleccionar cliente…</option>
                                 <?php foreach ($clientes as $c): ?>
-                                    <option value="<?= $c['id_usuario'] ?>">
-                                        <?= htmlspecialchars($c['nombres'] . ' ' . $c['apellidos']) ?>
+                                    <option value="<?= $c['id_persona'] ?>">
+                                        <?= htmlspecialchars($c['nombre']) ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -119,7 +143,7 @@ $vehiculos = $vModel->obtenerTodos();
                                 <option value="">Seleccionar vehículo…</option>
                                 <?php foreach ($vehiculos as $v): ?>
                                     <option value="<?= $v['id_vehiculo'] ?>">
-                                        <?= htmlspecialchars($v['placa'] . ' – ' . $v['marca'] . ' ' . $v['modelo']) ?>
+                                        <?= htmlspecialchars($v['placa'] . ' – ' . $v['marca'] . ' ' . $v['modelo'] . ' | Dueño: ' . $v['nombre_dueno']) ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -127,13 +151,20 @@ $vehiculos = $vModel->obtenerTodos();
                         <div class="col-sm-6">
                             <label class="form-label small fw-semibold">Empleado Asignado</label>
                             <select name="id_empleado" class="form-select">
-                                <option value="">Sin asignar</option>
+                                <option value="">— Sin asignar —</option>
                                 <?php foreach ($empleados as $e): ?>
-                                    <option value="<?= $e['id_usuario'] ?>">
-                                        <?= htmlspecialchars($e['nombres'] . ' ' . $e['apellidos']) ?>
+                                    <option value="<?= $e['id_persona'] ?>">
+                                        <?= htmlspecialchars($e['nombre']) ?>
+                                        <?= !empty($e['telefono']) ? ' · ' . htmlspecialchars($e['telefono']) : '' ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
+                            <?php if (empty($empleados)): ?>
+                                <div class="form-text text-warning">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    No hay empleados registrados en el sistema.
+                                </div>
+                            <?php endif; ?>
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label small fw-semibold">Tipo de Servicio *</label>

@@ -18,7 +18,7 @@ if ($rolData == 1 || strtolower($rolData) === 'administrador') {
     $rol = 'empleado';
 }
 
-$nombreCompleto = $usuario['nombres'] ?? 'Usuario';
+$nombreCompleto = $usuario['nombres'] ?? ($usuario['nombre'] ?? 'Usuario');
 
 // Determinar ítem activo
 $paginaActual = basename($_SERVER['PHP_SELF']);
@@ -159,7 +159,7 @@ $paginaActual = basename($_SERVER['PHP_SELF']);
             <a href="admin_usuarios.php" class="nav-link <?= $paginaActual=='admin_usuarios.php'?'active':'' ?>">
                 <i class="fas fa-user-tie"></i> Usuarios
             </a>
-            <a href="#" class="nav-link">
+            <a href="admin_clientes.php" class="nav-link <?= $paginaActual=='admin_clientes.php'?'active':'' ?>">
                 <i class="fas fa-users"></i> Clientes
             </a>
             <a href="admin_vehiculos.php" class="nav-link <?= $paginaActual=='admin_vehiculos.php'?'active':'' ?>">
@@ -167,6 +167,9 @@ $paginaActual = basename($_SERVER['PHP_SELF']);
             </a>
             <a href="admin_ordenes.php" class="nav-link <?= $paginaActual=='admin_ordenes.php'?'active':'' ?>">
                 <i class="fas fa-clipboard-list"></i> Órdenes de Trabajo
+            </a>
+            <a href="admin_citas.php" class="nav-link <?= $paginaActual=='admin_citas.php'?'active':'' ?>">
+                <i class="fas fa-calendar-check"></i> Citas
             </a>
             <a href="admin_cotizaciones.php" class="nav-link <?= $paginaActual=='admin_cotizaciones.php'?'active':'' ?>">
                 <i class="fas fa-file-invoice"></i> Cotizaciones
@@ -195,8 +198,14 @@ $paginaActual = basename($_SERVER['PHP_SELF']);
             </a>
 
             <div class="sidebar-section">Trabajo</div>
+            <a href="empleado_vehiculos.php" class="nav-link <?= $paginaActual=='empleado_vehiculos.php'?'active':'' ?>">
+                <i class="fas fa-car"></i> Vehículos
+            </a>
             <a href="empleado_ordenes.php" class="nav-link <?= $paginaActual=='empleado_ordenes.php'?'active':'' ?>">
                 <i class="fas fa-clipboard-list"></i> Mis Órdenes
+            </a>
+            <a href="empleado_citas.php" class="nav-link <?= $paginaActual=='empleado_citas.php'?'active':'' ?>">
+                <i class="fas fa-calendar-check"></i> Citas
             </a>
             <a href="empleado_historial.php" class="nav-link <?= $paginaActual=='empleado_historial.php'?'active':'' ?>">
                 <i class="fas fa-history"></i> Historial
