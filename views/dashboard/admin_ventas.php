@@ -13,10 +13,10 @@ $db    = (new Database())->conectar();
 $alert = $_SESSION['alert'] ?? null; unset($_SESSION['alert']);
 
 // ── Tarjetas resumen ──────────────────────────────────────────────────────
-$ventasHoy    = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM factura WHERE fecha = CURDATE()")->fetchColumn();
-$ventasSemana = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM factura WHERE YEARWEEK(fecha,1) = YEARWEEK(CURDATE(),1)")->fetchColumn();
-$ventasMes    = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM factura WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
-$ticketProm   = (float)$db->query("SELECT COALESCE(AVG(total),0) FROM factura WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
+$ventasHoy    = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM facturas WHERE fecha = CURDATE()")->fetchColumn();
+$ventasSemana = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM facturas WHERE YEARWEEK(fecha,1) = YEARWEEK(CURDATE(),1)")->fetchColumn();
+$ventasMes    = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
+$ticketProm   = (float)$db->query("SELECT COALESCE(AVG(total),0) FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
 
 // ── Gráfica: ventas reales últimos 7 días ─────────────────────────────────
 $stmtG7 = $db->query(
@@ -24,7 +24,7 @@ $stmtG7 = $db->query(
         DATE_FORMAT(fecha, '%d/%m') AS dia,
         fecha,
         COALESCE(SUM(total), 0)    AS total
-     FROM factura
+     FROM facturas
      WHERE fecha >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
      GROUP BY fecha
      ORDER BY fecha ASC"
@@ -46,8 +46,8 @@ $stmtServ = $db->query(
     "SELECT s.nombre,
             COUNT(*)                    AS total,
             SUM(ds.precio * ds.cantidad) AS ingresos
-     FROM detalle_servicio ds
-     JOIN servicio s ON ds.id_servicio = s.id_servicio
+     FROM cotizacion_servicios ds
+     JOIN servicios s ON ds.id_servicio = s.id_servicio
      GROUP BY s.id_servicio, s.nombre
      ORDER BY ingresos DESC
      LIMIT 5"
@@ -72,15 +72,15 @@ $maxServ = !empty($serviciosTop) ? max(array_column($serviciosTop, 'ingresos') ?
 // ── Ventas recientes ──────────────────────────────────────────────────────
 $stmtVentas = $db->query(
     "SELECT f.id_factura, f.fecha, f.total, f.estado_pago,
-            cl.nombre AS cliente_nombre,
+            cl.nombres AS cliente_nombre,
             v.placa,
             s.nombre  AS servicio_nombre
-     FROM factura f
-     JOIN cotizacion c  ON f.id_cotizacion = c.id_cotizacion
-     JOIN vehiculo v    ON c.id_vehiculo   = v.id_vehiculo
-     JOIN cliente  cl   ON v.id_cliente    = cl.id_cliente
-     LEFT JOIN detalle_servicio ds ON ds.id_cotizacion = c.id_cotizacion
-     LEFT JOIN servicio s ON ds.id_servicio = s.id_servicio
+     FROM facturas f
+     JOIN cotizaciones c  ON f.id_cotizacion = c.id_cotizacion
+     JOIN vehiculos v    ON c.id_vehiculo   = v.id_vehiculo
+     JOIN clientes  cl   ON v.id_cliente    = cl.id_cliente
+     LEFT JOIN cotizacion_servicios ds ON ds.id_cotizacion = c.id_cotizacion
+     LEFT JOIN servicios s ON ds.id_servicio = s.id_servicio
      ORDER BY f.fecha DESC, f.id_factura DESC
      LIMIT 20"
 );

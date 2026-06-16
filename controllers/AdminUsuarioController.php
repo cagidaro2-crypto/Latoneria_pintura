@@ -22,13 +22,16 @@ switch ($accion) {
         $password = trim($_POST['password'] ?? '');
         $idRol    = (int)($_POST['id_rol']  ?? 2);
 
-        if (empty($nombre) || empty($correo) || empty($telefono) || empty($password)) {
+        $nombres  = trim($_POST['nombres']  ?? '');
+        $apellidos = trim($_POST['apellidos'] ?? '');
+
+        if (empty($nombres) || empty($apellidos) || empty($correo) || empty($telefono) || empty($password)) {
             $_SESSION['alert'] = ['icon'=>'warning','title'=>'Campos incompletos','text'=>'Complete todos los campos obligatorios.'];
             header("Location: ../views/dashboard/admin_usuarios.php"); exit;
         }
 
         // Verificar correo duplicado
-        $stmt = $db->prepare("SELECT id_persona FROM persona WHERE correo = :correo LIMIT 1");
+        $stmt = $db->prepare("SELECT id_usuario FROM usuarios WHERE correo = :correo LIMIT 1");
         $stmt->execute([':correo' => $correo]);
         if ($stmt->rowCount() > 0) {
             $_SESSION['alert'] = ['icon'=>'error','title'=>'Correo duplicado','text'=>'Ya existe un usuario con ese correo.'];
@@ -37,14 +40,15 @@ switch ($accion) {
 
         try {
             $db->prepare(
-                "INSERT INTO persona (nombre, `contraseña`, correo, telefono, id_rol, activo)
-                 VALUES (:nombre, :pass, :correo, :telefono, :id_rol, 1)"
+                "INSERT INTO usuarios (nombres, apellidos, password, correo, telefono, id_rol, activo)
+                 VALUES (:nombres, :apellidos, :pass, :correo, :telefono, :id_rol, 1)"
             )->execute([
-                ':nombre'   => $nombre,
-                ':pass'     => password_hash($password, PASSWORD_DEFAULT),
-                ':correo'   => $correo,
-                ':telefono' => $telefono,
-                ':id_rol'   => $idRol,
+                ':nombres'   => $nombres,
+                ':apellidos' => $apellidos,
+                ':pass'      => password_hash($password, PASSWORD_DEFAULT),
+                ':correo'    => $correo,
+                ':telefono'  => $telefono,
+                ':id_rol'    => $idRol,
             ]);
             $_SESSION['alert'] = ['icon'=>'success','title'=>'Registrado','text'=>'Usuario registrado correctamente.'];
         } catch (Exception $e) {
@@ -54,14 +58,15 @@ switch ($accion) {
 
     // ── ACTUALIZAR ───────────────────────────────────────────────────────────
     case 'actualizar':
-        $id       = (int)($_POST['id_persona'] ?? 0);
-        $nombre   = trim($_POST['nombre']   ?? '');
-        $correo   = trim($_POST['correo']   ?? '');
-        $telefono = trim($_POST['telefono'] ?? '');
-        $idRol    = (int)($_POST['id_rol']  ?? 2);
-        $password = trim($_POST['password'] ?? '');
+        $id        = (int)($_POST['id_usuario'] ?? 0);
+        $nombres   = trim($_POST['nombres']  ?? '');
+        $apellidos = trim($_POST['apellidos'] ?? '');
+        $correo    = trim($_POST['correo']   ?? '');
+        $telefono  = trim($_POST['telefono'] ?? '');
+        $idRol     = (int)($_POST['id_rol']  ?? 2);
+        $password  = trim($_POST['password'] ?? '');
 
-        if (!$id || empty($nombre) || empty($correo) || empty($telefono)) {
+        if (!$id || empty($nombres) || empty($apellidos) || empty($correo) || empty($telefono)) {
             $_SESSION['alert'] = ['icon'=>'warning','title'=>'Campos incompletos','text'=>'Complete todos los campos obligatorios.'];
             header("Location: ../views/dashboard/admin_usuarios.php"); exit;
         }
@@ -69,26 +74,28 @@ switch ($accion) {
         try {
             if (!empty($password)) {
                 $db->prepare(
-                    "UPDATE persona SET nombre=:nombre, correo=:correo, telefono=:telefono,
-                     id_rol=:id_rol, `contraseña`=:pass WHERE id_persona=:id"
+                    "UPDATE usuarios SET nombres=:nombres, apellidos=:apellidos, correo=:correo, telefono=:telefono,
+                     id_rol=:id_rol, password=:pass WHERE id_usuario=:id"
                 )->execute([
-                    ':nombre'   => $nombre,
-                    ':correo'   => $correo,
-                    ':telefono' => $telefono,
-                    ':id_rol'   => $idRol,
-                    ':pass'     => password_hash($password, PASSWORD_DEFAULT),
-                    ':id'       => $id,
+                    ':nombres'   => $nombres,
+                    ':apellidos' => $apellidos,
+                    ':correo'    => $correo,
+                    ':telefono'  => $telefono,
+                    ':id_rol'    => $idRol,
+                    ':pass'      => password_hash($password, PASSWORD_DEFAULT),
+                    ':id'        => $id,
                 ]);
             } else {
                 $db->prepare(
-                    "UPDATE persona SET nombre=:nombre, correo=:correo, telefono=:telefono,
-                     id_rol=:id_rol WHERE id_persona=:id"
+                    "UPDATE usuarios SET nombres=:nombres, apellidos=:apellidos, correo=:correo, telefono=:telefono,
+                     id_rol=:id_rol WHERE id_usuario=:id"
                 )->execute([
-                    ':nombre'   => $nombre,
-                    ':correo'   => $correo,
-                    ':telefono' => $telefono,
-                    ':id_rol'   => $idRol,
-                    ':id'       => $id,
+                    ':nombres'   => $nombres,
+                    ':apellidos' => $apellidos,
+                    ':correo'    => $correo,
+                    ':telefono'  => $telefono,
+                    ':id_rol'    => $idRol,
+                    ':id'        => $id,
                 ]);
             }
             $_SESSION['alert'] = ['icon'=>'success','title'=>'Actualizado','text'=>'Usuario actualizado correctamente.'];
@@ -104,7 +111,7 @@ switch ($accion) {
             header("Location: ../views/dashboard/admin_usuarios.php"); exit;
         }
         try {
-            $db->prepare("UPDATE persona SET activo=0 WHERE id_persona=:id")
+            $db->prepare("UPDATE usuarios SET activo=0 WHERE id_usuario=:id")
                ->execute([':id' => $id]);
             $_SESSION['alert'] = ['icon'=>'success','title'=>'Eliminado','text'=>'Usuario desactivado correctamente.'];
         } catch (Exception $e) {

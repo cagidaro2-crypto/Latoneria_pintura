@@ -3,7 +3,7 @@
 class Usuario
 {
     private $conn;
-    private $tabla = "persona";
+    private $tabla = "usuarios";
 
     public function __construct($db)
     {
@@ -14,17 +14,17 @@ class Usuario
     public function existeCorreo($correo)
     {
         $stmt = $this->conn->prepare(
-            "SELECT id_persona FROM {$this->tabla} WHERE correo = :correo LIMIT 1"
+            "SELECT id_usuario FROM {$this->tabla} WHERE correo = :correo LIMIT 1"
         );
         $stmt->execute([':correo' => $correo]);
         return $stmt->rowCount() > 0;
     }
 
-    // Verificar correo o telefono (para registro)
+    // Verificar correo o teléfono (para registro)
     public function existeCorreoTelefono($correo, $telefono)
     {
         $stmt = $this->conn->prepare(
-            "SELECT id_persona FROM {$this->tabla}
+            "SELECT id_usuario FROM {$this->tabla}
              WHERE correo = :correo OR telefono = :telefono LIMIT 1"
         );
         $stmt->execute([':correo' => $correo, ':telefono' => $telefono]);
@@ -46,7 +46,7 @@ class Usuario
     {
         $campo = $metodo === 'telefono' ? 'telefono' : 'correo';
         $stmt  = $this->conn->prepare(
-            "SELECT id_persona FROM {$this->tabla}
+            "SELECT id_usuario FROM {$this->tabla}
              WHERE {$campo} = :valor AND activo = 1 LIMIT 1"
         );
         $stmt->execute([':valor' => $valor]);
@@ -59,7 +59,7 @@ class Usuario
         $campo = $metodo === 'telefono' ? 'telefono' : 'correo';
         $stmt  = $this->conn->prepare(
             "UPDATE {$this->tabla}
-             SET `contraseña` = :password,
+             SET `password` = :password,
                  intentos_fallidos = 0,
                  bloqueado_hasta = NULL
              WHERE {$campo} = :valor"
@@ -78,7 +78,7 @@ class Usuario
                      DATE_ADD(NOW(), INTERVAL 15 MINUTE),
                      bloqueado_hasta
                  )
-             WHERE id_persona = :id"
+             WHERE id_usuario = :id"
         );
         $stmt->execute([':id' => $id]);
     }
@@ -89,7 +89,7 @@ class Usuario
         $stmt = $this->conn->prepare(
             "UPDATE {$this->tabla}
              SET intentos_fallidos = 0, bloqueado_hasta = NULL
-             WHERE id_persona = :id"
+             WHERE id_usuario = :id"
         );
         $stmt->execute([':id' => $id]);
     }
@@ -99,15 +99,16 @@ class Usuario
     {
         try {
             $stmt = $this->conn->prepare(
-                "INSERT INTO {$this->tabla} (nombre, `contraseña`, correo, telefono, id_rol)
-                 VALUES (:nombre, :password, :correo, :telefono, :id_rol)"
+                "INSERT INTO {$this->tabla} (nombres, apellidos, `password`, correo, telefono, id_rol)
+                 VALUES (:nombres, :apellidos, :password, :correo, :telefono, :id_rol)"
             );
             $stmt->execute([
-                ':nombre'   => $datos['nombre'],
-                ':password' => $datos['password'],
-                ':correo'   => $datos['correo'],
-                ':telefono' => $datos['telefono'],
-                ':id_rol'   => 2,
+                ':nombres'   => $datos['nombre'],
+                ':apellidos' => $datos['apellidos'],
+                ':password'  => $datos['password'],
+                ':correo'    => $datos['correo'],
+                ':telefono'  => $datos['telefono'],
+                ':id_rol'    => 3, // 3 = Cliente según el SQL real
             ]);
             return true;
         } catch (Exception $e) {
@@ -119,7 +120,7 @@ class Usuario
     public function obtenerPorId($id)
     {
         $stmt = $this->conn->prepare(
-            "SELECT * FROM {$this->tabla} WHERE id_persona = :id LIMIT 1"
+            "SELECT * FROM {$this->tabla} WHERE id_usuario = :id LIMIT 1"
         );
         $stmt->execute([':id' => $id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
@@ -131,24 +132,24 @@ class Usuario
         if ($rol) {
             $idRol = match($rol) {
                 'administrador' => 1,
-                'cliente'       => 2,
-                'empleado'      => 3,
-                default         => 2,
+                'empleado'      => 2,
+                'cliente'       => 3,
+                default         => 3,
             };
             $stmt = $this->conn->prepare(
-                "SELECT p.*, r.nombre_rol AS rol_nombre
-                 FROM {$this->tabla} p
-                 JOIN roles r ON p.id_rol = r.id_rol
-                 WHERE p.id_rol = :id_rol
-                 ORDER BY p.nombre"
+                "SELECT u.*, r.nombre_rol AS rol_nombre
+                 FROM {$this->tabla} u
+                 JOIN roles r ON u.id_rol = r.id_rol
+                 WHERE u.id_rol = :id_rol
+                 ORDER BY u.nombres"
             );
             $stmt->execute([':id_rol' => $idRol]);
         } else {
             $stmt = $this->conn->query(
-                "SELECT p.*, r.nombre_rol AS rol_nombre
-                 FROM {$this->tabla} p
-                 JOIN roles r ON p.id_rol = r.id_rol
-                 ORDER BY p.nombre"
+                "SELECT u.*, r.nombre_rol AS rol_nombre
+                 FROM {$this->tabla} u
+                 JOIN roles r ON u.id_rol = r.id_rol
+                 ORDER BY u.nombres"
             );
         }
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -159,8 +160,8 @@ class Usuario
     {
         $idRol = match($rolNombre) {
             'administrador' => 1,
-            'empleado'      => 3,
-            default         => 2,
+            'empleado'      => 2,
+            default         => 3,
         };
         $stmt = $this->conn->prepare(
             "SELECT COUNT(*) FROM {$this->tabla} WHERE id_rol = :id_rol"

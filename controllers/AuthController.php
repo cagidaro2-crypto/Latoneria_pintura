@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../models/Usuario.php';
@@ -41,25 +43,25 @@ class AuthController
             header("Location: ../views/usuarios/login.php"); exit;
         }
 
-        if (!password_verify($password, $usuario['contraseña'])) {
-            $model->registrarIntentoFallido($usuario['id_persona']);
+        if (!password_verify($password, $usuario['password'])) {
+            $model->registrarIntentoFallido($usuario['id_usuario']);
             $_SESSION['alert'] = ['icon'=>'error','title'=>'Contraseña incorrecta','text'=>'Correo o contraseña incorrectos.'];
             header("Location: ../views/usuarios/login.php"); exit;
         }
 
-        $model->resetearIntentos($usuario['id_persona']);
+        $model->resetearIntentos($usuario['id_usuario']);
         session_regenerate_id(true);
 
         $_SESSION['usuario'] = [
-            'id_usuario' => $usuario['id_persona'],
-            'nombres'    => $usuario['nombre'],
+            'id_usuario' => $usuario['id_usuario'],
+            'nombres'    => $usuario['nombres'],
             'correo'     => $usuario['correo'],
             'rol'        => $usuario['id_rol'],
         ];
 
         match ((int)$usuario['id_rol']) {
             1       => header("Location: ../views/dashboard/admin_dashboard.php"),
-            3       => header("Location: ../views/dashboard/empleado_dashboard.php"),
+            2       => header("Location: ../views/dashboard/empleado_dashboard.php"),
             default => header("Location: ../views/dashboard/cliente_dashboard.php"),
         };
         exit;
@@ -72,13 +74,14 @@ class AuthController
             header("Location: ../views/usuarios/registre.php"); exit;
         }
 
-        $nombre      = trim($_POST['nombre']          ?? '');
+        $nombre      = trim($_POST['nombres']         ?? '');
+        $apellidos   = trim($_POST['apellidos']       ?? '');
         $correo      = trim($_POST['correo']          ?? '');
         $telefono    = trim($_POST['telefono']        ?? '');
         $password    = trim($_POST['password']        ?? '');
         $passConfirm = trim($_POST['password_confirm']?? '');
 
-        if (empty($nombre) || empty($correo) || empty($telefono) || empty($password)) {
+        if (empty($nombre) || empty($apellidos) || empty($correo) || empty($telefono) || empty($password)) {
             $_SESSION['alert'] = ['icon'=>'warning','title'=>'Campos incompletos','text'=>'Completa todos los campos obligatorios.'];
             header("Location: ../views/usuarios/registre.php"); exit;
         }
@@ -102,10 +105,11 @@ class AuthController
         }
 
         $res = $model->registrar([
-            'nombre'   => $nombre,
-            'correo'   => $correo,
-            'telefono' => $telefono,
-            'password' => password_hash($password, PASSWORD_DEFAULT),
+            'nombre'    => $nombre,
+            'apellidos' => $apellidos,
+            'correo'    => $correo,
+            'telefono'  => $telefono,
+            'password'  => password_hash($password, PASSWORD_DEFAULT),
         ]);
 
         if ($res === true) {
@@ -175,14 +179,16 @@ class AuthController
     }
 }
 
-// ── Dispatcher ─────────────────────────────────────────────────────────────
-$controller = new AuthController();
-$accion     = $_GET['accion'] ?? 'login';
+// ── Dispatcher (solo cuando se accede directamente a este archivo) ──────────
+if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
+    $controller = new AuthController();
+    $accion     = $_GET['accion'] ?? 'login';
 
-match ($accion) {
-    'logout'    => $controller->logout(),
-    'registro'  => $controller->registro(),
-    'recuperar' => $controller->recuperar(),
-    default     => $controller->login(),
-};
+    match ($accion) {
+        'logout'    => $controller->logout(),
+        'registro'  => $controller->registro(),
+        'recuperar' => $controller->recuperar(),
+        default     => $controller->login(),
+    };
+}
 ?>

@@ -21,9 +21,9 @@ unset($_SESSION['alert']);
 // Vehículos con dueño para el modal de cambio de estado
 $stmtVeh = $db->query(
     "SELECT v.id_vehiculo, v.placa, v.marca, v.modelo,
-            cl.nombre AS nombre_dueno
-     FROM vehiculo v
-     JOIN cliente cl ON v.id_cliente = cl.id_cliente
+            CONCAT(cl.nombres, ' ', COALESCE(cl.apellidos, '')) AS nombre_dueno
+     FROM vehiculos v
+     JOIN clientes cl ON v.id_cliente = cl.id_cliente
      ORDER BY v.placa ASC"
 );
 $vehiculos = $stmtVeh ? $stmtVeh->fetchAll(PDO::FETCH_ASSOC) : [];
@@ -32,21 +32,20 @@ $vehiculos = $stmtVeh ? $stmtVeh->fetchAll(PDO::FETCH_ASSOC) : [];
 // Como OrdenServicio es un stub, consultamos directo
 // Adaptado a la BD real: historial_vehiculo como proxy de órdenes
 $stmtOrd = $db->query(
-    "SELECT hv.id_historial_vehiculo AS id_orden,
+    "SELECT hv.id_historial AS id_orden,
             hv.descripcion,
             hv.fecha_registro,
             hv.tipo_reparacion,
             v.placa,
             v.marca,
             v.modelo,
-            cl.nombre AS cliente_nombre,
-            p.nombre  AS empleado_nombre,
+            cl.nombres AS cliente_nombre,
+            CONCAT(u.nombres, ' ', COALESCE(u.apellidos, '')) AS empleado_nombre,
             ev.estado
      FROM historial_vehiculo hv
-     JOIN vehiculo      v   ON hv.id_vehiculo  = v.id_vehiculo
-     JOIN cliente       cl  ON v.id_cliente    = cl.id_cliente
-     JOIN empleado      e   ON hv.id_empleado  = e.id_empleado
-     JOIN persona       p   ON e.id_persona    = p.id_persona
+     JOIN vehiculos      v   ON hv.id_vehiculo  = v.id_vehiculo
+     JOIN clientes       cl  ON v.id_cliente    = cl.id_cliente
+     LEFT JOIN usuarios  u   ON hv.id_usuario   = u.id_usuario
      JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
      ORDER BY hv.fecha_registro DESC"
 );
@@ -206,7 +205,7 @@ $estados = $stmtEst->fetchAll(PDO::FETCH_ASSOC);
         icon:  '<?= $alert['icon'] ?>',
         title: '<?= $alert['title'] ?>',
         text:  '<?= $alert['text'] ?>',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#000000'
     });
 </script>
 <?php endif; ?>

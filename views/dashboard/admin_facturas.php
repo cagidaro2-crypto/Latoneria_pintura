@@ -15,13 +15,13 @@ $alert = $_SESSION['alert'] ?? null; unset($_SESSION['alert']);
 // Facturas: factura → cotizacion → vehiculo → cliente
 $stmt = $db->query(
     "SELECT f.*,
-            cl.nombre AS cliente_nombre,
+            cl.nombres AS cliente_nombre,
             v.placa,
             c.fecha   AS fecha_cotizacion
-     FROM factura f
-     JOIN cotizacion c ON f.id_cotizacion = c.id_cotizacion
-     JOIN vehiculo v   ON c.id_vehiculo   = v.id_vehiculo
-     JOIN cliente  cl  ON v.id_cliente    = cl.id_cliente
+     FROM facturas f
+     JOIN cotizaciones c ON f.id_cotizacion = c.id_cotizacion
+     JOIN vehiculos v   ON c.id_vehiculo   = v.id_vehiculo
+     JOIN clientes  cl  ON v.id_cliente    = cl.id_cliente
      ORDER BY f.fecha DESC"
 );
 $facturas = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
@@ -161,7 +161,7 @@ $facturas = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
         icon:  '<?= $alert['icon'] ?>',
         title: '<?= $alert['title'] ?>',
         text:  '<?= $alert['text'] ?>',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#000000'
     });
 </script>
 <?php endif; ?>

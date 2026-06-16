@@ -14,23 +14,22 @@ $alert = $_SESSION['alert'] ?? null; unset($_SESSION['alert']);
 
 // Historial completo con datos de vehículo y cliente
 $stmtH = $db->query(
-    "SELECT hv.id_historial_vehiculo,
+    "SELECT hv.id_historial,
             hv.descripcion,
             hv.fecha_registro,
             hv.tipo_reparacion,
             v.placa,
             v.marca,
             v.modelo,
-            cl.nombre  AS cliente_nombre,
-            p.nombre   AS empleado_nombre,
+            cl.nombres  AS cliente_nombre,
+            CONCAT(u.nombres, ' ', COALESCE(u.apellidos, '')) AS empleado_nombre,
             ev.estado  AS estado_vehiculo
      FROM historial_vehiculo hv
-     JOIN vehiculo       v   ON hv.id_vehiculo  = v.id_vehiculo
-     JOIN cliente        cl  ON v.id_cliente    = cl.id_cliente
-     JOIN empleado       e   ON hv.id_empleado  = e.id_empleado
-     JOIN persona        p   ON e.id_persona    = p.id_persona
+     JOIN vehiculos      v   ON hv.id_vehiculo  = v.id_vehiculo
+     JOIN clientes       cl  ON v.id_cliente    = cl.id_cliente
+     LEFT JOIN usuarios  u   ON hv.id_usuario   = u.id_usuario
      JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
-     ORDER BY hv.fecha_registro DESC, hv.id_historial_vehiculo DESC"
+     ORDER BY hv.fecha_registro DESC, hv.id_historial DESC"
 );
 $historial = $stmtH ? $stmtH->fetchAll(PDO::FETCH_ASSOC) : [];
 
@@ -163,7 +162,7 @@ sort($tipos);
         icon:  '<?= $alert['icon'] ?>',
         title: '<?= $alert['title'] ?>',
         text:  '<?= $alert['text'] ?>',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#000000'
     });
 </script>
 <?php endif; ?>

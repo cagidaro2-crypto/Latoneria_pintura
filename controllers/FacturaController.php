@@ -15,7 +15,7 @@ switch ($accion) {
         $id = (int)($_POST['id_factura'] ?? 0);
         try {
             // estado_pago existe tras ejecutar tablas_faltantes.sql
-            $db->prepare("UPDATE factura SET estado_pago='Pagada' WHERE id_factura=:id")
+            $db->prepare("UPDATE facturas SET estado_pago='Pagada' WHERE id_factura=:id")
                ->execute([':id' => $id]);
             $_SESSION['alert'] = ['icon'=>'success','title'=>'Pagada','text'=>'Factura marcada como pagada.'];
         } catch (Exception $e) {
@@ -27,12 +27,12 @@ switch ($accion) {
         $id   = (int)($_GET['id'] ?? 0);
         $stmt = $db->prepare(
             "SELECT f.*,
-                    cl.nombre AS cliente_nombre,
+                    cl.nombres AS cliente_nombre,
                     v.placa
-             FROM factura f
-             JOIN cotizacion c ON f.id_cotizacion = c.id_cotizacion
-             JOIN vehiculo v   ON c.id_vehiculo   = v.id_vehiculo
-             JOIN cliente  cl  ON v.id_cliente    = cl.id_cliente
+             FROM facturas f
+             JOIN cotizaciones c ON f.id_cotizacion = c.id_cotizacion
+             JOIN vehiculos v   ON c.id_vehiculo   = v.id_vehiculo
+             JOIN clientes  cl  ON v.id_cliente    = cl.id_cliente
              WHERE f.id_factura = :id"
         );
         $stmt->execute([':id' => $id]);

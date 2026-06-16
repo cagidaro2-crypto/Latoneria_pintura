@@ -15,7 +15,7 @@ if (!isset($_SESSION['usuario'])) {
 }
 
 $usuario = $_SESSION['usuario'];
-$rol     = (int)($usuario['rol'] ?? 0);   // 1=admin, 2=cliente, 3=empleado
+$rol     = (int)($usuario['rol'] ?? 0);   // 1=admin, 2=empleado, 3=cliente
 
 // ── Rutas de redirección por rol ──────────────────────────────────────────────
 $rutaAdmin    = '../views/dashboard/admin_vehiculos.php';
@@ -24,7 +24,7 @@ $rutaCliente  = '../views/dashboard/cliente_vehiculos.php';
 
 $rutaRol = match($rol) {
     1       => $rutaAdmin,
-    3       => $rutaEmpleado,
+    2       => $rutaEmpleado,
     default => $rutaCliente,
 };
 
@@ -40,7 +40,7 @@ switch ($accion) {
      *  REGISTRAR — disponible para admin (rol 1) y cliente (rol 2)
      * ══════════════════════════════════════════════════════════════════════════ */
     case 'registrar':
-        if ($rol !== 1 && $rol !== 2) {
+        if ($rol !== 1 && $rol !== 3) {
             $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Sin permiso', 'text' => 'No tiene permiso para esta acción.'];
             header("Location: {$rutaRol}");
             exit;
@@ -50,6 +50,7 @@ switch ($accion) {
         $marca  = trim($_POST['marca']  ?? '');
         $modelo = trim($_POST['modelo'] ?? '');
         $anio   = trim($_POST['anio']   ?? ($_POST['año'] ?? ''));
+        $color  = trim($_POST['color']  ?? '');
 
         if (empty($placa) || empty($marca) || empty($modelo) || empty($anio)) {
             $_SESSION['alert'] = ['icon' => 'warning', 'title' => 'Campos incompletos', 'text' => 'Complete todos los campos obligatorios.'];
@@ -65,105 +66,87 @@ switch ($accion) {
 
         // ── Determinar id_cliente ─────────────────────────────────────────────
         if ($rol === 1) {
-            // Admin selecciona el cliente — puede venir de tabla cliente o de persona
             $idClientePost = (int)($_POST['id_cliente'] ?? 0);
             if (!$idClientePost) {
                 $_SESSION['alert'] = ['icon' => 'warning', 'title' => 'Cliente requerido', 'text' => 'Seleccione un cliente.'];
-                header("Location: {$rutaRol}");
-                exit;
+                header("Location: {$rutaRol}"); exit;
             }
-
-            // Verificar si el id existe en tabla cliente
-            $stmtCheck = $db->prepare("SELECT id_cliente FROM cliente WHERE id_cliente = :id LIMIT 1");
+            // Verificar en tabla clientes (schema nuevo)
+            $stmtCheck = $db->prepare("SELECT id_cliente FROM clientes WHERE id_cliente = :id LIMIT 1");
             $stmtCheck->execute([':id' => $idClientePost]);
-
-            if ($stmtCheck->rowCount() > 0) {
-                // Ya existe en tabla cliente — usar directo
-                $idCliente = $idClientePost;
-            } else {
-                // Viene de tabla persona — buscar por correo o crear en cliente
-                $stmtP = $db->prepare("SELECT nombre, correo, telefono FROM persona WHERE id_persona = :id LIMIT 1");
-                $stmtP->execute([':id' => $idClientePost]);
-                $persona = $stmtP->fetch(PDO::FETCH_ASSOC);
-
-                if (!$persona) {
-                    $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Cliente no encontrado', 'text' => 'No se encontró el cliente seleccionado.'];
-                    header("Location: {$rutaRol}");
-                    exit;
-                }
-
-                // Buscar si ya tiene registro en cliente por correo
-                $idCliente = $vModel->buscarIdClientePorCorreo($persona['correo']);
-                if (!$idCliente) {
-                    // Crear en tabla cliente
-                    $idCliente = $vModel->crearClienteDesdePersona([
-                        'nombre'   => $persona['nombre'],
-                        'correo'   => $persona['correo'],
-                        'telefono' => $persona['telefono'] ?? '',
-                    ]);
-                }
+            $idCliente = $stmtCheck->rowCount() > 0 ? $idClientePost : null;
+            if (!$idCliente) {
+                $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Cliente no encontrado', 'text' => 'El cliente seleccionado no existe.'];
+                header("Location: {$rutaRol}"); exit;
             }
         } else {
-            // Cliente: buscar su registro en tabla cliente por correo de sesión
+            // Cliente registrado: buscar en tabla clientes por correo
             $correoSesion = $usuario['correo'] ?? '';
-            $idCliente    = $vModel->buscarIdClientePorCorreo($correoSesion);
+            $stmtCli = $db->prepare("SELECT id_cliente FROM clientes WHERE correo = :c LIMIT 1");
+            $stmtCli->execute([':c' => $correoSesion]);
+            $idCliente = (int)($stmtCli->fetchColumn() ?: 0);
 
             if (!$idCliente) {
-                // No existe en tabla cliente → crearlo desde datos de sesión
+                // Crear entrada en clientes si no existe
                 try {
-                    // Obtener datos completos desde persona
-                    $stmtP = $db->prepare("SELECT nombre, correo, telefono FROM persona WHERE correo = :correo LIMIT 1");
-                    $stmtP->execute([':correo' => $correoSesion]);
-                    $persona = $stmtP->fetch(PDO::FETCH_ASSOC);
-
-                    if (!$persona) {
-                        $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Error', 'text' => 'No se encontró su perfil de usuario.'];
-                        header("Location: {$rutaRol}");
-                        exit;
-                    }
-
-                    $idCliente = $vModel->crearClienteDesdePersona([
-                        'nombre'   => $persona['nombre'],
-                        'correo'   => $persona['correo'],
-                        'telefono' => $persona['telefono'] ?? '',
-                    ]);
+                    $db->prepare(
+                        "INSERT INTO clientes (nombres, apellidos, correo, telefono)
+                         SELECT nombres, apellidos, correo, telefono FROM usuarios WHERE correo = :c LIMIT 1"
+                    )->execute([':c' => $correoSesion]);
+                    $idCliente = (int)$db->lastInsertId();
                 } catch (Exception $e) {
-                    $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Error', 'text' => 'No se pudo crear el perfil de cliente: ' . $e->getMessage()];
-                    header("Location: {$rutaRol}");
-                    exit;
+                    $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Error', 'text' => 'No se pudo vincular el perfil de cliente.'];
+                    header("Location: {$rutaRol}"); exit;
                 }
             }
         }
 
         $idEstado = (int)($_POST['id_estado_vehiculo'] ?? 0);
-
-        // Si no viene estado o es 0, usar el primer estado disponible en la BD
         if (!$idEstado) {
-            $stmtEst = $db->query("SELECT id_estado_vehiculo FROM estado_vehiculo ORDER BY id_estado_vehiculo LIMIT 1");
-            $firstEst = $stmtEst ? $stmtEst->fetchColumn() : null;
-            if (!$firstEst) {
-                $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Sin estados', 'text' => 'No hay estados de vehículo configurados. Ejecuta el archivo database/datos_iniciales.sql en tu base de datos.'];
-                header("Location: {$rutaRol}");
-                exit;
-            }
-            $idEstado = (int)$firstEst;
+            $firstEst = $db->query("SELECT id_estado_vehiculo FROM estado_vehiculo ORDER BY id_estado_vehiculo LIMIT 1")->fetchColumn();
+            $idEstado = $firstEst ? (int)$firstEst : 1;
         }
 
         try {
-            $res = $vModel->registrar([
-                'placa'              => $placa,
-                'marca'              => $marca,
-                'modelo'             => $modelo,
-                'año'                => $anio,
-                'id_cliente'         => $idCliente,
-                'id_estado_vehiculo' => $idEstado,
+            // Insertar en tabla vehiculos (schema nuevo)
+            $stmtIns = $db->prepare(
+                "INSERT INTO vehiculos (placa, marca, modelo, anio, color, id_cliente, id_estado)
+                 VALUES (:placa, :marca, :modelo, :anio, :color, :id_cliente, :id_estado)"
+            );
+            $stmtIns->execute([
+                ':placa'      => $placa,
+                ':marca'      => $marca,
+                ':modelo'     => $modelo,
+                ':anio'       => $anio,
+                ':color'      => $color,
+                ':id_cliente' => $idCliente,
+                ':id_estado'  => $idEstado,
             ]);
+            $idVehiculo = (int)$db->lastInsertId();
 
-            if ($res === true) {
-                $_SESSION['alert'] = ['icon' => 'success', 'title' => 'Registrado', 'text' => 'Vehículo registrado correctamente.'];
-            } else {
-                $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Error', 'text' => $res];
+            // ── Subir foto si se adjuntó ──────────────────────────────────
+            if (!empty($_FILES['foto']['name']) && $_FILES['foto']['error'] === UPLOAD_ERR_OK) {
+                $ext      = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
+                $allowed  = ['jpg','jpeg','png','webp'];
+                if (in_array($ext, $allowed)) {
+                    $dir      = __DIR__ . '/../public/uploads/vehiculos/';
+                    if (!is_dir($dir)) mkdir($dir, 0775, true);
+                    $filename = 'v_' . $idVehiculo . '_' . time() . '.' . $ext;
+                    if (move_uploaded_file($_FILES['foto']['tmp_name'], $dir . $filename)) {
+                        $db->prepare(
+                            "INSERT INTO vehiculo_fotos (id_vehiculo, id_usuario, nombre_archivo, ruta_archivo, etapa)
+                             VALUES (:iv, :iu, :nombre, :ruta, 'antes')"
+                        )->execute([
+                            ':iv'     => $idVehiculo,
+                            ':iu'     => (int)($usuario['id_usuario'] ?? 0),
+                            ':nombre' => $filename,
+                            ':ruta'   => 'uploads/vehiculos/' . $filename,
+                        ]);
+                    }
+                }
             }
+
+            $_SESSION['alert'] = ['icon' => 'success', 'title' => '¡Registrado!', 'text' => 'Vehículo registrado correctamente.'];
         } catch (Exception $e) {
             $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Error', 'text' => $e->getMessage()];
         }
@@ -267,34 +250,25 @@ switch ($accion) {
         }
 
         try {
-            $idPersonaActual = (int)($usuario['id_usuario'] ?? 0);
+            $idUsuarioActual = (int)($usuario['id_usuario'] ?? 0);
 
             // Si el admin seleccionó un empleado específico en el formulario, usarlo
-            $idPersonaAsignada = (int)($_POST['id_empleado_asignado'] ?? 0);
-            if ($idPersonaAsignada) {
-                $idPersonaActual = $idPersonaAsignada;
-            }
+            $idEmpleadoSeleccionado = (int)($_POST['id_empleado_asignado'] ?? 0);
+            $idUsuarioSeleccionado = $idEmpleadoSeleccionado ?: $idUsuarioActual;
 
-            // 1. Buscar en tabla empleado por id_persona
             $stmtEmp = $db->prepare(
-                "SELECT id_empleado FROM empleado WHERE id_persona = :id LIMIT 1"
+                "SELECT id_usuario FROM usuarios WHERE id_usuario = :id AND id_rol = 2 LIMIT 1"
             );
-            $stmtEmp->execute([':id' => $idPersonaActual]);
+            $stmtEmp->execute([':id' => $idUsuarioSeleccionado]);
             $empRow = $stmtEmp->fetch(PDO::FETCH_ASSOC);
 
-            // 2. Si no existe en tabla empleado → crearlo automáticamente
-            if (!$empRow && $idPersonaActual) {
-                $db->prepare(
-                    "INSERT INTO empleado (id_persona) VALUES (:id)"
-                )->execute([':id' => $idPersonaActual]);
-                $idEmpleado = (int)$db->lastInsertId();
-            } elseif ($empRow) {
-                $idEmpleado = (int)$empRow['id_empleado'];
-            } else {
+            if (!$empRow) {
                 $_SESSION['alert'] = ['icon' => 'error', 'title' => 'Error', 'text' => 'No se pudo identificar al empleado. Verifica que tu sesión esté activa.'];
                 header("Location: {$rutaRol}");
                 exit;
             }
+
+            $idEmpleado = (int)$empRow['id_usuario'];
 
             $res = $vModel->agregarHistorial([
                 'descripcion'     => $descripcion,

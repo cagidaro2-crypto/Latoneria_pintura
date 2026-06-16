@@ -21,8 +21,8 @@ try {
 
     // Vehículos en proceso (estado "En reparación" o "Pintura")
     $stmtVeh = $db->query(
-        "SELECT COUNT(*) FROM vehiculo v
-         JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
+        "SELECT COUNT(*) FROM vehiculos v
+         JOIN estado_vehiculo ev ON v.id_estado = ev.id_estado_vehiculo
          WHERE ev.estado IN ('En reparación','Pintura')"
     );
     $vehiculosEnProceso = (int)$stmtVeh->fetchColumn();
@@ -37,7 +37,7 @@ try {
     // Ventas del mes (facturas pagadas o pendientes del mes actual)
     $stmtVentas = $db->query(
         "SELECT COALESCE(SUM(total), 0)
-         FROM factura
+         FROM facturas
          WHERE MONTH(fecha) = MONTH(CURDATE())
            AND YEAR(fecha)  = YEAR(CURDATE())"
     );
@@ -46,7 +46,7 @@ try {
     // Ventas mes anterior (para % comparativa)
     $stmtVentasAnt = $db->query(
         "SELECT COALESCE(SUM(total), 0)
-         FROM factura
+         FROM facturas
          WHERE MONTH(fecha) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
            AND YEAR(fecha)  = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))"
     );
@@ -80,7 +80,7 @@ try {
             DATE_FORMAT(fecha, '%b') AS mes,
             DATE_FORMAT(fecha, '%Y-%m') AS mes_key,
             COALESCE(SUM(total), 0) AS total
-         FROM factura
+         FROM facturas
          WHERE fecha >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
          GROUP BY mes_key, mes
          ORDER BY mes_key ASC"
@@ -103,11 +103,11 @@ try {
     // ── Vehículos recientes (últimos 5) ───────────────────────────────────
     $stmtVehRec = $db->query(
         "SELECT v.placa, v.marca, v.modelo,
-                cl.nombre AS cliente_nombre,
+                cl.nombres AS cliente_nombre,
                 ev.estado
-         FROM vehiculo v
-         JOIN cliente       cl ON v.id_cliente        = cl.id_cliente
-         JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
+         FROM vehiculos v
+         JOIN clientes       cl ON v.id_cliente        = cl.id_cliente
+         JOIN estado_vehiculo ev ON v.id_estado = ev.id_estado_vehiculo
          ORDER BY v.id_vehiculo DESC
          LIMIT 5"
     );

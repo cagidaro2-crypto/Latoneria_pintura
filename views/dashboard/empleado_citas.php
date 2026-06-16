@@ -16,12 +16,12 @@ unset($_SESSION['alert']);
 // Obtener todas las citas con datos de cliente y vehículo
 $stmtCitas = $db->query(
     "SELECT c.*,
-            p.nombre   AS cliente_nombre,
-            p.telefono AS cliente_telefono,
+            cl.nombres   AS cliente_nombre,
+            cl.telefono  AS cliente_telefono,
             v.placa, v.marca, v.modelo
      FROM citas c
-     LEFT JOIN persona  p ON c.id_cliente  = p.id_persona
-     LEFT JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
+     LEFT JOIN clientes cl ON c.id_cliente  = cl.id_cliente
+     LEFT JOIN vehiculos v ON c.id_vehiculo = v.id_vehiculo
      ORDER BY c.fecha_cita DESC"
 );
 $todasCitas  = $stmtCitas ? $stmtCitas->fetchAll(PDO::FETCH_ASSOC) : [];
@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
         icon:  '<?= addslashes($alert['icon']) ?>',
         title: '<?= addslashes($alert['title']) ?>',
         text:  '<?= addslashes($alert['text']) ?>',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#000000'
     });
 });
 </script>

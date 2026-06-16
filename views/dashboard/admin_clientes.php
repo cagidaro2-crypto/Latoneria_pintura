@@ -13,12 +13,12 @@ $db    = (new Database())->conectar();
 $alert = $_SESSION['alert'] ?? null;
 unset($_SESSION['alert']);
 
-// Columnas reales de tabla persona: id_persona, nombre, contraseña, correo, telefono, id_rol, activo
+// Columnas reales de tabla usuarios: id_usuario, id_rol, nombres, apellidos, correo, telefono, password, activo
 $stmt = $db->query(
-    "SELECT id_persona, nombre, correo, telefono, activo
-     FROM persona
-     WHERE id_rol = 2
-     ORDER BY nombre ASC"
+    "SELECT id_usuario, nombres, apellidos, correo, telefono, activo
+     FROM usuarios
+     WHERE id_rol = 3
+     ORDER BY nombres ASC"
 );
 $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
@@ -61,9 +61,11 @@ $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     </tr>
                 </thead>
                 <tbody>
-                <?php foreach ($clientes as $c): ?>
+                <?php foreach ($clientes as $c):
+                    $nombreCompleto = trim(($c['nombres'] ?? '') . ' ' . ($c['apellidos'] ?? '')) ?: '–';
+                ?>
                 <tr>
-                    <td class="fw-semibold"><?= htmlspecialchars($c['nombre'] ?? '–') ?></td>
+                    <td class="fw-semibold"><?= htmlspecialchars($nombreCompleto) ?></td>
                     <td>
                         <div class="small">
                             <i class="fas fa-phone text-muted me-1"></i>
@@ -83,21 +85,21 @@ $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <i class="fas fa-edit"></i>
                         </button>
                         <?php if (($c['activo'] ?? 1)): ?>
-                            <a href="../../controllers/AdminClienteController.php?accion=toggle&id=<?= $c['id_persona'] ?>&estado=0"
+                            <a href="../../controllers/AdminClienteController.php?accion=toggle&id=<?= $c['id_usuario'] ?>&estado=0"
                                class="btn btn-sm btn-outline-warning me-1"
                                onclick="return confirm('¿Desactivar este cliente?')"
                                title="Desactivar">
                                 <i class="fas fa-ban"></i>
                             </a>
                         <?php else: ?>
-                            <a href="../../controllers/AdminClienteController.php?accion=toggle&id=<?= $c['id_persona'] ?>&estado=1"
+                            <a href="../../controllers/AdminClienteController.php?accion=toggle&id=<?= $c['id_usuario'] ?>&estado=1"
                                class="btn btn-sm btn-outline-success me-1"
                                onclick="return confirm('¿Activar este cliente?')"
                                title="Activar">
                                 <i class="fas fa-check-circle"></i>
                             </a>
                         <?php endif; ?>
-                        <a href="../../controllers/AdminClienteController.php?accion=eliminar&id=<?= $c['id_persona'] ?>"
+                        <a href="../../controllers/AdminClienteController.php?accion=eliminar&id=<?= $c['id_usuario'] ?>"
                            class="btn btn-sm btn-outline-danger"
                            onclick="return confirm('¿Eliminar permanentemente este cliente?')"
                            title="Eliminar">
@@ -129,10 +131,15 @@ $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <input type="hidden" name="accion" value="registrar">
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label small fw-semibold">Nombre completo *</label>
-                            <input type="text" name="nombre" class="form-control" required
-                                   placeholder="Ej: Juan Pérez">
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Nombres *</label>
+                            <input type="text" name="nombres" class="form-control" required
+                                   placeholder="Ej: Juan">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Apellidos *</label>
+                            <input type="text" name="apellidos" class="form-control" required
+                                   placeholder="Ej: Pérez">
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label small fw-semibold">Correo *</label>
@@ -174,12 +181,18 @@ $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
             </div>
             <form action="../../controllers/AdminClienteController.php" method="POST">
                 <input type="hidden" name="accion" value="actualizar">
-                <input type="hidden" name="id_persona" id="editIdCliente">
+                <input type="hidden" name="id_usuario" id="editIdCliente">
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label small fw-semibold">Nombre completo *</label>
-                            <input type="text" name="nombre" id="editNombreCliente" class="form-control" required>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Nombres *</label>
+                            <input type="text" name="nombres" id="editNombresCliente" class="form-control" required
+                                   placeholder="Ej: Juan">
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Apellidos *</label>
+                            <input type="text" name="apellidos" id="editApellidosCliente" class="form-control" required
+                                   placeholder="Ej: Pérez">
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label small fw-semibold">Correo *</label>
@@ -216,7 +229,7 @@ $clientes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         icon:  '<?= $alert['icon'] ?>',
         title: '<?= $alert['title'] ?>',
         text:  '<?= $alert['text'] ?>',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#000000'
     });
 </script>
 <?php endif; ?>
@@ -230,10 +243,11 @@ document.getElementById('buscador').addEventListener('input', function () {
 });
 
 function editarCliente(c) {
-    document.getElementById('editIdCliente').value      = c.id_persona;
-    document.getElementById('editNombreCliente').value  = c.nombre   ?? '';
-    document.getElementById('editCorreoCliente').value  = c.correo   ?? '';
-    document.getElementById('editTelefonoCliente').value= c.telefono ?? '';
+    document.getElementById('editIdCliente').value        = c.id_usuario;
+    document.getElementById('editNombresCliente').value   = c.nombres   ?? '';
+    document.getElementById('editApellidosCliente').value = c.apellidos ?? '';
+    document.getElementById('editCorreoCliente').value     = c.correo    ?? '';
+    document.getElementById('editTelefonoCliente').value   = c.telefono  ?? '';
     new bootstrap.Modal(document.getElementById('modalEditarCliente')).show();
 }
 </script>

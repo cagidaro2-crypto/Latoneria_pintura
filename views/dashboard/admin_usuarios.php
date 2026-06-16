@@ -19,8 +19,8 @@ $usuarios = $model->obtenerTodos();
 
 // Mapa de roles: id_rol → texto y badge
 $roles = [
-    1 => ['texto' => 'Administrador', 'badge' => 'bg-primary'],
-    2 => ['texto' => 'Cliente',       'badge' => 'bg-secondary'],
+    1 => ['texto' => 'Administrador', 'badge' => 'bg-dark'],
+    2 => ['texto' => 'Cliente',       'badge' => 'bg-success'],
     3 => ['texto' => 'Empleado',      'badge' => 'bg-info text-dark'],
 ];
 ?>
@@ -68,10 +68,11 @@ $roles = [
                 <?php foreach ($usuarios as $i => $u):
                     $idRol  = (int)($u['id_rol'] ?? 0);
                     $rolInfo = $roles[$idRol] ?? ['texto' => 'Desconocido', 'badge' => 'bg-secondary'];
+                    $nombreCompleto = trim(($u['nombres'] ?? '') . ' ' . ($u['apellidos'] ?? '')) ?: '–';
                 ?>
                 <tr>
                     <td class="text-muted small"><?= $i + 1 ?></td>
-                    <td class="fw-semibold"><?= htmlspecialchars($u['nombre'] ?? '–') ?></td>
+                    <td class="fw-semibold"><?= htmlspecialchars($nombreCompleto) ?></td>
                     <td class="text-muted small"><?= htmlspecialchars($u['correo'] ?? '–') ?></td>
                     <td><?= htmlspecialchars($u['telefono'] ?? '–') ?></td>
                     <td>
@@ -90,7 +91,7 @@ $roles = [
                                 title="Editar">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <a href="../../controllers/AdminUsuarioController.php?accion=eliminar&id=<?= $u['id_persona'] ?>"
+                        <a href="../../controllers/AdminUsuarioController.php?accion=eliminar&id=<?= $u['id_usuario'] ?>"
                            class="btn btn-sm btn-outline-danger"
                            onclick="return confirm('¿Eliminar este usuario?')"
                            title="Eliminar">
@@ -122,10 +123,15 @@ $roles = [
                 <input type="hidden" name="accion" value="registrar">
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label small fw-semibold">Nombre completo *</label>
-                            <input type="text" name="nombre" class="form-control" required
-                                   placeholder="Ej: Carlos Rodríguez">
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Nombres *</label>
+                            <input type="text" name="nombres" class="form-control" required
+                                   placeholder="Ej: Carlos" />
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Apellidos *</label>
+                            <input type="text" name="apellidos" class="form-control" required
+                                   placeholder="Ej: Rodríguez" />
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label small fw-semibold">Correo *</label>
@@ -175,12 +181,16 @@ $roles = [
             </div>
             <form action="../../controllers/AdminUsuarioController.php" method="POST">
                 <input type="hidden" name="accion" value="actualizar">
-                <input type="hidden" name="id_persona" id="editId">
+                <input type="hidden" name="id_usuario" id="editId">
                 <div class="modal-body">
                     <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label small fw-semibold">Nombre completo *</label>
-                            <input type="text" name="nombre" id="editNombre" class="form-control" required>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Nombres *</label>
+                            <input type="text" name="nombres" id="editNombres" class="form-control" required>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label small fw-semibold">Apellidos *</label>
+                            <input type="text" name="apellidos" id="editApellidos" class="form-control" required>
                         </div>
                         <div class="col-sm-6">
                             <label class="form-label small fw-semibold">Correo *</label>
@@ -225,7 +235,7 @@ $roles = [
         icon:  '<?= $alert['icon'] ?>',
         title: '<?= $alert['title'] ?>',
         text:  '<?= $alert['text'] ?>',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#000000'
     });
 </script>
 <?php endif; ?>
@@ -241,11 +251,12 @@ document.getElementById('buscador').addEventListener('input', function () {
 
 // Poblar modal editar
 function editarUsuario(u) {
-    document.getElementById('editId').value      = u.id_persona;
-    document.getElementById('editNombre').value  = u.nombre   ?? '';
-    document.getElementById('editCorreo').value  = u.correo   ?? '';
-    document.getElementById('editTelefono').value= u.telefono ?? '';
-    document.getElementById('editRol').value     = u.id_rol   ?? 2;
+    document.getElementById('editId').value       = u.id_usuario;
+    document.getElementById('editNombres').value   = u.nombres   ?? '';
+    document.getElementById('editApellidos').value = u.apellidos ?? '';
+    document.getElementById('editCorreo').value    = u.correo    ?? '';
+    document.getElementById('editTelefono').value  = u.telefono  ?? '';
+    document.getElementById('editRol').value       = u.id_rol    ?? 2;
     new bootstrap.Modal(document.getElementById('modalEditar')).show();
 }
 </script>

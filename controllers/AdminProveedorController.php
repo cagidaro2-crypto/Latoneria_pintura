@@ -23,7 +23,7 @@ switch ($accion) {
 
         try {
             $db->prepare(
-                "INSERT INTO proveedor (nombre, telefono, correo) VALUES (:nombre, :tel, :correo)"
+                "INSERT INTO proveedores (nombre, telefono, correo) VALUES (:nombre, :tel, :correo)"
             )->execute([':nombre'=>$nombre, ':tel'=>$telefono, ':correo'=>$correo]);
             $_SESSION['alert'] = ['icon'=>'success','title'=>'Registrado','text'=>'Proveedor registrado correctamente.'];
         } catch (Exception $e) {
@@ -39,7 +39,7 @@ switch ($accion) {
 
         try {
             $db->prepare(
-                "UPDATE proveedor SET nombre=:nombre, telefono=:tel, correo=:correo WHERE id_proveedor=:id"
+                "UPDATE proveedores SET nombre=:nombre, telefono=:tel, correo=:correo WHERE id_proveedor=:id"
             )->execute([':nombre'=>$nombre,':tel'=>$telefono,':correo'=>$correo,':id'=>$id]);
             $_SESSION['alert'] = ['icon'=>'success','title'=>'Actualizado','text'=>'Proveedor actualizado correctamente.'];
         } catch (Exception $e) {
@@ -50,7 +50,7 @@ switch ($accion) {
     case 'eliminar':
         $id = (int)($_GET['id'] ?? 0);
         try {
-            $db->prepare("DELETE FROM proveedor WHERE id_proveedor=:id")->execute([':id'=>$id]);
+            $db->prepare("DELETE FROM proveedores WHERE id_proveedor=:id")->execute([':id'=>$id]);
             $_SESSION['alert'] = ['icon'=>'success','title'=>'Eliminado','text'=>'Proveedor eliminado.'];
         } catch (Exception $e) {
             $_SESSION['alert'] = ['icon'=>'error','title'=>'Error','text'=>'No se puede eliminar: tiene repuestos asociados.'];

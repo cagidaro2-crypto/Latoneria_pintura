@@ -32,7 +32,7 @@ switch ($accion) {
         }
 
         // Verificar que el vehículo existe en la BD
-        $stmtV = $db->prepare("SELECT id_vehiculo FROM vehiculo WHERE id_vehiculo = :id LIMIT 1");
+        $stmtV = $db->prepare("SELECT id_vehiculo FROM vehiculos WHERE id_vehiculo = :id LIMIT 1");
         $stmtV->execute([':id' => $idVehiculo]);
         if (!$stmtV->fetch()) {
             $_SESSION['alert'] = ['icon'=>'error','title'=>'Vehículo no encontrado','text'=>'El vehículo seleccionado no existe.'];
@@ -40,57 +40,28 @@ switch ($accion) {
         }
 
         // Registrar en historial_vehiculo (tabla real de la BD)
-        // Primero obtener o crear id_empleado para el responsable
-        $idPersonaActual = (int)($_SESSION['usuario']['id_usuario'] ?? 0);
-        $idEmpResponsable = $idEmpleado; // si se asignó un empleado, usar ese
-
-        if (!$idEmpResponsable) {
-            // Usar el usuario actual como responsable
-            $stmtEmp = $db->prepare("SELECT id_empleado FROM empleado WHERE id_persona = :id LIMIT 1");
-            $stmtEmp->execute([':id' => $idPersonaActual]);
-            $empRow = $stmtEmp->fetch(PDO::FETCH_ASSOC);
-
-            if (!$empRow) {
-                // Crear registro en empleado si no existe
-                $db->prepare("INSERT INTO empleado (id_persona) VALUES (:id)")
-                   ->execute([':id' => $idPersonaActual]);
-                $idEmpResponsable = (int)$db->lastInsertId();
-            } else {
-                $idEmpResponsable = (int)$empRow['id_empleado'];
-            }
-        } else {
-            // Verificar que el empleado asignado tiene registro en tabla empleado
-            $stmtEmp2 = $db->prepare("SELECT id_empleado FROM empleado WHERE id_persona = :id LIMIT 1");
-            $stmtEmp2->execute([':id' => $idEmpleado]);
-            $empRow2 = $stmtEmp2->fetch(PDO::FETCH_ASSOC);
-
-            if (!$empRow2) {
-                $db->prepare("INSERT INTO empleado (id_persona) VALUES (:id)")
-                   ->execute([':id' => $idEmpleado]);
-                $idEmpResponsable = (int)$db->lastInsertId();
-            } else {
-                $idEmpResponsable = (int)$empRow2['id_empleado'];
-            }
-        }
+        // Use id_usuario responsable en lugar de la tabla legacy empleado
+        $idUsuarioActual     = (int)($_SESSION['usuario']['id_usuario'] ?? 0);
+        $idUsuarioResponsable = $idEmpleado ?: $idUsuarioActual;
 
         try {
             $db->prepare(
                 "INSERT INTO historial_vehiculo
-                    (descripcion, fecha_registro, tipo_reparacion, id_empleado, id_vehiculo)
+                    (descripcion, fecha_registro, tipo_reparacion, id_usuario, id_vehiculo)
                  VALUES
-                    (:desc, CURDATE(), :tipo, :id_emp, :id_veh)"
+                    (:desc, CURDATE(), :tipo, :id_usuario, :id_veh)"
             )->execute([
-                ':desc'   => $descripcion ?: "Orden de servicio: {$tipo}",
-                ':tipo'   => $tipo,
-                ':id_emp' => $idEmpResponsable,
-                ':id_veh' => $idVehiculo,
+                ':desc'      => $descripcion ?: "Orden de servicio: {$tipo}",
+                ':tipo'      => $tipo,
+                ':id_usuario'=> $idUsuarioResponsable ?: null,
+                ':id_veh'    => $idVehiculo,
             ]);
 
             // Cambiar estado del vehículo a "En reparación" (id 2) si existe
             $stmtEst = $db->query("SELECT id_estado_vehiculo FROM estado_vehiculo WHERE estado LIKE '%reparaci%' LIMIT 1");
             $estRow  = $stmtEst ? $stmtEst->fetch(PDO::FETCH_ASSOC) : null;
             if ($estRow) {
-                $db->prepare("UPDATE vehiculo SET id_estado_vehiculo = :est WHERE id_vehiculo = :id")
+                $db->prepare("UPDATE vehiculos SET id_estado_vehiculo = :est WHERE id_vehiculo = :id")
                    ->execute([':est' => $estRow['id_estado_vehiculo'], ':id' => $idVehiculo]);
             }
 
@@ -112,17 +83,17 @@ switch ($accion) {
             header("Location: ../views/dashboard/admin_ordenes.php"); exit;
         }
 
-        // id_orden aquí es id_historial_vehiculo
+        // id_orden aquí es id_historial
         try {
             // Actualizar descripción con observación si viene
             if ($observacion) {
                 $db->prepare(
-                    "UPDATE historial_vehiculo SET descripcion = :obs WHERE id_historial_vehiculo = :id"
+                    "UPDATE historial_vehiculo SET descripcion = :obs WHERE id_historial = :id"
                 )->execute([':obs' => $observacion, ':id' => $idOrden]);
             }
 
             // Cambiar estado del vehículo asociado
-            $stmtH = $db->prepare("SELECT id_vehiculo FROM historial_vehiculo WHERE id_historial_vehiculo = :id LIMIT 1");
+            $stmtH = $db->prepare("SELECT id_vehiculo FROM historial_vehiculo WHERE id_historial = :id LIMIT 1");
             $stmtH->execute([':id' => $idOrden]);
             $hRow = $stmtH->fetch(PDO::FETCH_ASSOC);
 
@@ -132,7 +103,7 @@ switch ($accion) {
                 $estRow = $stmtEst->fetch(PDO::FETCH_ASSOC);
 
                 if ($estRow) {
-                    $db->prepare("UPDATE vehiculo SET id_estado_vehiculo = :est WHERE id_vehiculo = :id")
+                    $db->prepare("UPDATE vehiculos SET id_estado_vehiculo = :est WHERE id_vehiculo = :id")
                        ->execute([':est' => $estRow['id_estado_vehiculo'], ':id' => $hRow['id_vehiculo']]);
                 }
             }

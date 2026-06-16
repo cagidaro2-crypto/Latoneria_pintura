@@ -35,14 +35,14 @@ switch ($accion) {
             }
 
             $db->prepare(
-                "INSERT INTO cotizacion (fecha, pago_total, id_vehiculo) VALUES (:fecha, :total, :idv)"
+                "INSERT INTO cotizaciones (fecha, pago_total, id_vehiculo) VALUES (:fecha, :total, :idv)"
             )->execute([':fecha'=>$fecha, ':total'=>$total, ':idv'=>$idVehiculo]);
             $idCot = $db->lastInsertId();
 
             foreach ($servicios as $i => $idServ) {
                 if (!$idServ) continue;
                 $db->prepare(
-                    "INSERT INTO detalle_servicio (precio, cantidad, id_servicio, id_cotizacion)
+                    "INSERT INTO cotizacion_servicios (precio, cantidad, id_servicio, id_cotizacion)
                      VALUES (:precio, :cantidad, :idserv, :idcot)"
                 )->execute([
                     ':precio'    => (float)($precios[$i] ?? 0),
@@ -64,13 +64,13 @@ switch ($accion) {
         $id = (int)($_POST['id_cotizacion'] ?? 0);
         try {
             // Crear factura automáticamente al aprobar
-            $cot = $db->prepare("SELECT * FROM cotizacion WHERE id_cotizacion=:id");
+            $cot = $db->prepare("SELECT * FROM cotizaciones WHERE id_cotizacion=:id");
             $cot->execute([':id'=>$id]);
             $cotData = $cot->fetch(PDO::FETCH_ASSOC);
 
             if ($cotData) {
                 $db->prepare(
-                    "INSERT INTO factura (fecha, total, id_cotizacion) VALUES (CURDATE(), :total, :idcot)"
+                    "INSERT INTO facturas (fecha, total, id_cotizacion) VALUES (CURDATE(), :total, :idcot)"
                 )->execute([':total'=>$cotData['pago_total'],':idcot'=>$id]);
             }
             $_SESSION['alert'] = ['icon'=>'success','title'=>'Aprobada','text'=>'Cotización aprobada y factura generada.'];

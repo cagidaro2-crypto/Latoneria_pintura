@@ -13,23 +13,23 @@ $db    = (new Database())->conectar();
 $alert = $_SESSION['alert'] ?? null; unset($_SESSION['alert']);
 
 // Resumen del mes
-$ventasMes  = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM factura WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
-$ventasHoy  = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM factura WHERE fecha=CURDATE()")->fetchColumn();
-$totalFact  = (int)$db->query("SELECT COUNT(*) FROM factura WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
-$pagadas    = (int)$db->query("SELECT COUNT(*) FROM factura WHERE estado_pago='Pagada' AND MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
+$ventasMes  = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
+$ventasHoy  = (float)$db->query("SELECT COALESCE(SUM(total),0) FROM facturas WHERE fecha=CURDATE()")->fetchColumn();
+$totalFact  = (int)$db->query("SELECT COUNT(*) FROM facturas WHERE MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
+$pagadas    = (int)$db->query("SELECT COUNT(*) FROM facturas WHERE estado_pago='Pagada' AND MONTH(fecha)=MONTH(CURDATE()) AND YEAR(fecha)=YEAR(CURDATE())")->fetchColumn();
 
 // Facturas recientes con cliente y vehículo
 $stmtF = $db->query(
     "SELECT f.id_factura, f.fecha, f.total, f.estado_pago,
-            cl.nombre AS cliente_nombre,
+            cl.nombres AS cliente_nombre,
             v.placa, v.marca, v.modelo,
             s.nombre  AS servicio_nombre
-     FROM factura f
-     JOIN cotizacion c  ON f.id_cotizacion = c.id_cotizacion
-     JOIN vehiculo v    ON c.id_vehiculo   = v.id_vehiculo
-     JOIN cliente  cl   ON v.id_cliente    = cl.id_cliente
-     LEFT JOIN detalle_servicio ds ON ds.id_cotizacion = c.id_cotizacion
-     LEFT JOIN servicio s ON ds.id_servicio = s.id_servicio
+     FROM facturas f
+     JOIN cotizaciones c  ON f.id_cotizacion = c.id_cotizacion
+     JOIN vehiculos v     ON c.id_vehiculo   = v.id_vehiculo
+     JOIN clientes cl     ON v.id_cliente    = cl.id_cliente
+     LEFT JOIN cotizacion_servicios ds ON ds.id_cotizacion = c.id_cotizacion
+     LEFT JOIN servicios s ON ds.id_servicio = s.id_servicio
      ORDER BY f.fecha DESC, f.id_factura DESC
      LIMIT 30"
 );
@@ -168,7 +168,7 @@ $facturas = $stmtF ? $stmtF->fetchAll(PDO::FETCH_ASSOC) : [];
         icon:  '<?= $alert['icon'] ?>',
         title: '<?= $alert['title'] ?>',
         text:  '<?= $alert['text'] ?>',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#000000'
     });
 </script>
 <?php endif; ?>

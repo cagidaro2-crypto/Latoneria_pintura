@@ -15,11 +15,11 @@ $alert = $_SESSION['alert'] ?? null; unset($_SESSION['alert']);
 // ── Cotizaciones: cotizacion → vehiculo → cliente ─────────────────────────
 $stmt = $db->query(
     "SELECT c.*,
-            cl.nombre AS cliente_nombre,
+            cl.nombres AS cliente_nombre,
             v.placa
-     FROM cotizacion c
-     JOIN vehiculo v  ON c.id_vehiculo  = v.id_vehiculo
-     JOIN cliente  cl ON v.id_cliente   = cl.id_cliente
+     FROM cotizaciones c
+     JOIN vehiculos v  ON c.id_vehiculo = v.id_vehiculo
+     JOIN clientes cl ON v.id_cliente   = cl.id_cliente
      ORDER BY c.fecha DESC"
 );
 $cotizaciones = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
@@ -30,14 +30,15 @@ $vehiculos = $db->query(
             v.placa,
             v.marca,
             v.modelo,
-            cl.nombre AS cliente_nombre
-     FROM vehiculo v
-     JOIN cliente cl ON v.id_cliente = cl.id_cliente
+            cl.nombres AS cliente_nombre
+     FROM vehiculos v
+     JOIN clientes cl ON v.id_cliente = cl.id_cliente
      ORDER BY v.placa"
 )->fetchAll(PDO::FETCH_ASSOC);
 
 // ── Servicios disponibles ─────────────────────────────────────────────────
-$servicios = $db->query("SELECT * FROM servicio ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
+$servicios = [];
+try { $servicios = $db->query("SELECT * FROM servicios ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC); } catch(Exception $e) {}
 
 // ── Cotización seleccionada para detalle ──────────────────────────────────
 $idSeleccionada  = (int)($_GET['id'] ?? 0);
@@ -47,10 +48,10 @@ $detallesRep     = [];
 
 if ($idSeleccionada) {
     $stmtCot = $db->prepare(
-        "SELECT c.*, cl.nombre AS cliente_nombre, v.placa
-         FROM cotizacion c
-         JOIN vehiculo v  ON c.id_vehiculo = v.id_vehiculo
-         JOIN cliente  cl ON v.id_cliente  = cl.id_cliente
+        "SELECT c.*, cl.nombres AS cliente_nombre, v.placa
+         FROM cotizaciones c
+         JOIN vehiculos v  ON c.id_vehiculo = v.id_vehiculo
+         JOIN clientes cl ON v.id_cliente  = cl.id_cliente
          WHERE c.id_cotizacion = :id"
     );
     $stmtCot->execute([':id' => $idSeleccionada]);
@@ -58,17 +59,17 @@ if ($idSeleccionada) {
 
     $stmtDs = $db->prepare(
         "SELECT ds.*, s.nombre AS servicio_nombre
-         FROM detalle_servicio ds
-         JOIN servicio s ON ds.id_servicio = s.id_servicio
+         FROM cotizacion_servicios ds
+         JOIN servicios s ON ds.id_servicio = s.id_servicio
          WHERE ds.id_cotizacion = :id"
     );
     $stmtDs->execute([':id' => $idSeleccionada]);
     $detallesServ = $stmtDs->fetchAll(PDO::FETCH_ASSOC);
 
     $stmtDr = $db->prepare(
-        "SELECT dr.*, r.nombre AS repuesto_nombre
-         FROM detalle_repuesto dr
-         JOIN repuesto r ON dr.id_repuesto = r.id_repuesto
+        "SELECT dr.*, p.nombre AS repuesto_nombre
+         FROM cotizacion_productos dr
+         JOIN productos p ON dr.id_producto = p.id_producto
          WHERE dr.id_cotizacion = :id"
     );
     $stmtDr->execute([':id' => $idSeleccionada]);

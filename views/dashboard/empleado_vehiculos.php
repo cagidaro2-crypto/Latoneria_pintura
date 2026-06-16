@@ -93,7 +93,7 @@ $estados   = $vModel->obtenerEstados();
                     <td class="fw-bold font-monospace"><?= htmlspecialchars($v['placa']) ?></td>
                     <td>
                         <div class="fw-semibold"><?= htmlspecialchars($v['marca'] . ' ' . $v['modelo']) ?></div>
-                        <div class="text-muted small"><?= htmlspecialchars($v['año'] ?? '') ?></div>
+                        <div class=\"text-muted small\"><?= htmlspecialchars($v['anio'] ?? '') ?></div>
                     </td>
                     <td>
                         <div><?= htmlspecialchars($v['nombre_cliente'] ?? '–') ?></div>
@@ -231,7 +231,7 @@ $estados   = $vModel->obtenerEstados();
         icon: '<?= htmlspecialchars($alert['icon']) ?>',
         title: '<?= htmlspecialchars($alert['title']) ?>',
         text: '<?= htmlspecialchars($alert['text']) ?>',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#000000'
     });
 </script>
 <?php endif; ?>

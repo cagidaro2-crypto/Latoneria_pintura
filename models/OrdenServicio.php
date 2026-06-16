@@ -24,13 +24,13 @@ class OrdenServicio
 
             $this->conn->prepare(
                 "INSERT INTO historial_vehiculo
-                    (descripcion, fecha_registro, tipo_reparacion, id_empleado, id_vehiculo)
+                    (descripcion, fecha_registro, tipo_reparacion, id_usuario, id_vehiculo)
                  VALUES
-                    (:descripcion, CURDATE(), :tipo, :id_empleado, :id_vehiculo)"
+                    (:descripcion, CURDATE(), :tipo, :id_usuario, :id_vehiculo)"
             )->execute([
                 ':descripcion' => ($datos['descripcion'] ?: 'Orden: ' . $datos['tipo_servicio']),
                 ':tipo'        => $datos['tipo_servicio'],
-                ':id_empleado' => $datos['id_empleado'] ?? null,
+                ':id_usuario'  => $datos['id_usuario'] ?? ($datos['id_empleado'] ?? null),
                 ':id_vehiculo' => (int)$datos['id_vehiculo'],
             ]);
 
@@ -46,8 +46,8 @@ class OrdenServicio
     public function obtenerTodas(): array
     {
         $sql = "SELECT
-                    hv.id_historial_vehiculo  AS id_orden,
-                    CONCAT('ORD-', LPAD(hv.id_historial_vehiculo, 4, '0')) AS numero_orden,
+                    hv.id_historial  AS id_orden,
+                    CONCAT('ORD-', LPAD(hv.id_historial, 4, '0')) AS numero_orden,
                     hv.descripcion,
                     hv.fecha_registro         AS fecha_ingreso,
                     hv.tipo_reparacion        AS tipo_servicio,
@@ -55,18 +55,17 @@ class OrdenServicio
                     v.placa,
                     v.marca,
                     v.modelo,
-                    c.nombre                  AS cliente_nombre,
-                    c.correo                  AS cliente_correo,
-                    p.nombre                  AS empleado_nombre,
-                    e.id_empleado,
+                    c.nombres                AS cliente_nombre,
+                    c.correo                 AS cliente_correo,
+                    CONCAT(u.nombres, ' ', COALESCE(u.apellidos, '')) AS empleado_nombre,
+                    u.id_usuario,
                     ev.estado
                 FROM historial_vehiculo hv
-                JOIN vehiculo           v  ON hv.id_vehiculo  = v.id_vehiculo
-                JOIN cliente            c  ON v.id_cliente    = c.id_cliente
-                LEFT JOIN empleado      e  ON hv.id_empleado  = e.id_empleado
-                LEFT JOIN persona       p  ON e.id_persona    = p.id_persona
-                JOIN estado_vehiculo    ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
-                ORDER BY hv.fecha_registro DESC, hv.id_historial_vehiculo DESC";
+                JOIN vehiculos          v  ON hv.id_vehiculo  = v.id_vehiculo
+                JOIN clientes           c  ON v.id_cliente    = c.id_cliente
+                LEFT JOIN usuarios      u  ON hv.id_usuario = u.id_usuario
+                JOIN estado_vehiculo    ev ON v.id_estado = ev.id_estado_vehiculo
+                ORDER BY hv.fecha_registro DESC, hv.id_historial DESC";
 
         return $this->conn->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -77,17 +76,18 @@ class OrdenServicio
     public function obtenerPorCliente(int $idCliente): array
     {
         $sql = "SELECT
-                    hv.id_historial_vehiculo AS id_orden,
-                    CONCAT('ORD-', LPAD(hv.id_historial_vehiculo, 4, '0')) AS numero_orden,
+                    hv.id_historial AS id_orden,
+                    CONCAT('ORD-', LPAD(hv.id_historial, 4, '0')) AS numero_orden,
                     hv.descripcion,
                     hv.fecha_registro        AS fecha_ingreso,
                     hv.tipo_reparacion       AS tipo_servicio,
                     v.placa, v.marca, v.modelo,
                     ev.estado
                 FROM historial_vehiculo hv
-                JOIN vehiculo        v  ON hv.id_vehiculo = v.id_vehiculo
-                JOIN cliente         c  ON v.id_cliente   = c.id_cliente
-                JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
+                JOIN vehiculos        v  ON hv.id_vehiculo = v.id_vehiculo
+                JOIN clientes         c  ON v.id_cliente   = c.id_cliente
+                LEFT JOIN usuarios    u  ON hv.id_usuario = u.id_usuario
+                JOIN estado_vehiculo ev ON v.id_estado = ev.id_estado_vehiculo
                 WHERE c.id_cliente = :id
                 ORDER BY hv.fecha_registro DESC";
 
@@ -103,18 +103,17 @@ class OrdenServicio
     {
         $sql = "SELECT
                     hv.*,
-                    CONCAT('ORD-', LPAD(hv.id_historial_vehiculo, 4, '0')) AS numero_orden,
+                    CONCAT('ORD-', LPAD(hv.id_historial, 4, '0')) AS numero_orden,
                     v.placa, v.marca, v.modelo,
-                    c.nombre AS cliente_nombre,
-                    p.nombre AS empleado_nombre,
+                    c.nombres AS cliente_nombre,
+                    CONCAT(u.nombres, ' ', COALESCE(u.apellidos, '')) AS empleado_nombre,
                     ev.estado
                 FROM historial_vehiculo hv
-                JOIN vehiculo        v  ON hv.id_vehiculo = v.id_vehiculo
-                JOIN cliente         c  ON v.id_cliente   = c.id_cliente
-                LEFT JOIN empleado   e  ON hv.id_empleado = e.id_empleado
-                LEFT JOIN persona    p  ON e.id_persona   = p.id_persona
-                JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
-                WHERE hv.id_historial_vehiculo = :id
+                JOIN vehiculos        v  ON hv.id_vehiculo = v.id_vehiculo
+                JOIN clientes         c  ON v.id_cliente   = c.id_cliente
+                LEFT JOIN usuarios    u  ON hv.id_usuario = u.id_usuario
+                JOIN estado_vehiculo ev ON v.id_estado = ev.id_estado_vehiculo
+                WHERE hv.id_historial = :id
                 LIMIT 1";
 
         $stmt = $this->conn->prepare($sql);
@@ -130,7 +129,7 @@ class OrdenServicio
         try {
             // Obtener id_vehiculo de la orden
             $stmt = $this->conn->prepare(
-                "SELECT id_vehiculo FROM historial_vehiculo WHERE id_historial_vehiculo = :id LIMIT 1"
+                "SELECT id_vehiculo FROM historial_vehiculo WHERE id_historial = :id LIMIT 1"
             );
             $stmt->execute([':id' => $idOrden]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -146,7 +145,7 @@ class OrdenServicio
 
             // Actualizar estado del vehículo
             $this->conn->prepare(
-                "UPDATE vehiculo SET id_estado_vehiculo = :id_estado WHERE id_vehiculo = :id_v"
+                "UPDATE vehiculos SET id_estado = :id_estado WHERE id_vehiculo = :id_v"
             )->execute([
                 ':id_estado' => $estado['id_estado_vehiculo'],
                 ':id_v'      => $row['id_vehiculo'],
@@ -155,7 +154,7 @@ class OrdenServicio
             // Registrar en historial si hay observación
             if (!empty($obs)) {
                 $this->conn->prepare(
-                    "INSERT INTO historial_vehiculo (descripcion, fecha_registro, tipo_reparacion, id_empleado, id_vehiculo)
+                    "INSERT INTO historial_vehiculo (descripcion, fecha_registro, tipo_reparacion, id_usuario, id_vehiculo)
                      VALUES (:desc, CURDATE(), :tipo, :emp, :veh)"
                 )->execute([
                     ':desc' => $obs,
@@ -178,7 +177,7 @@ class OrdenServicio
     {
         try {
             $this->conn->prepare(
-                "UPDATE historial_vehiculo SET id_empleado = :emp WHERE id_historial_vehiculo = :id"
+                "UPDATE historial_vehiculo SET id_usuario = :emp WHERE id_historial = :id"
             )->execute([':emp' => $idEmpleado, ':id' => $idOrden]);
             return true;
         } catch (Exception $e) {
@@ -194,8 +193,8 @@ class OrdenServicio
         // Considera activa si el vehículo NO está en estado Finalizado/Entregado
         $stmt = $this->conn->prepare(
             "SELECT v.id_vehiculo
-             FROM vehiculo v
-             JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
+             FROM vehiculos v
+             JOIN estado_vehiculo ev ON v.id_estado = ev.id_estado_vehiculo
              WHERE v.id_vehiculo = :id
                AND ev.estado NOT IN ('Finalizado','Entregado')
              LIMIT 1"
@@ -207,8 +206,8 @@ class OrdenServicio
     public function contarPorEstado(string $estado): int
     {
         $stmt = $this->conn->prepare(
-            "SELECT COUNT(*) FROM vehiculo v
-             JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
+            "SELECT COUNT(*) FROM vehiculos v
+             JOIN estado_vehiculo ev ON v.id_estado = ev.id_estado_vehiculo
              WHERE ev.estado = :estado"
         );
         $stmt->execute([':estado' => $estado]);

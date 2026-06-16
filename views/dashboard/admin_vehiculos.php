@@ -18,37 +18,57 @@ unset($_SESSION['alert']);
 $vehiculos = $vModel->obtenerTodos();
 $estados   = $vModel->obtenerEstados();
 
-// Empleados: todos con id_rol=3, con o sin registro en tabla empleado
+// Fechas de entrada y salida por vehículo desde historial_vehiculo
+$stmtFechas = $db->query(
+    "SELECT
+        id_vehiculo,
+        MIN(fecha_registro) AS fecha_entrada,
+        MAX(CASE WHEN tipo_reparacion = 'Entrega' THEN fecha_registro END) AS fecha_salida
+     FROM historial_vehiculo
+     GROUP BY id_vehiculo"
+);
+$fechasMap = [];
+if ($stmtFechas) {
+    foreach ($stmtFechas->fetchAll(PDO::FETCH_ASSOC) as $f) {
+        $fechasMap[$f['id_vehiculo']] = $f;
+    }
+}
+
+// Fotos de vehículos: una por vehículo (la más reciente)
+$stmtFotos = $db->query(
+    "SELECT id_vehiculo, nombre_archivo, descripcion
+     FROM vehiculo_fotos
+     WHERE id_foto IN (
+        SELECT MAX(id_foto) FROM vehiculo_fotos GROUP BY id_vehiculo
+     )"
+);
+$fotosMap = [];
+if ($stmtFotos) {
+    foreach ($stmtFotos->fetchAll(PDO::FETCH_ASSOC) as $f) {
+        $fotosMap[$f['id_vehiculo']] = $f;
+    }
+}
+
+// Empleados: todos con rol cliente/usuario activo
 $stmtEmpVeh = $db->query(
-    "SELECT p.id_persona, p.nombre, p.telefono
-     FROM persona p
-     WHERE p.id_rol = 3 AND p.activo = 1
-     ORDER BY p.nombre ASC"
+    "SELECT u.id_usuario, u.nombres, u.apellidos, u.telefono
+     FROM usuarios u
+     WHERE u.id_rol = 2 AND u.activo = 1
+     ORDER BY u.nombres ASC"
 );
 $empleadosVeh = $stmtEmpVeh->fetchAll(PDO::FETCH_ASSOC);
 
-// Clientes: unión de tabla cliente + personas con rol 2 que tengan registro en cliente
-// Primero intentamos desde tabla cliente (que es la que referencia vehiculo)
-// Si el cliente se registró por persona, buscamos su registro en cliente por correo
+// Clientes: tabla clientes asociada directamente a vehiculos
 $stmtCli = $db->query(
-    "SELECT cl.id_cliente, cl.nombre, cl.correo, cl.telefono
-     FROM cliente cl
-     ORDER BY cl.nombre ASC"
+    "SELECT cl.id_cliente, cl.nombres, cl.apellidos, cl.correo, cl.telefono
+     FROM clientes cl
+     ORDER BY cl.nombres ASC"
 );
 $clientes = $stmtCli->fetchAll(PDO::FETCH_ASSOC);
 
-// Si no hay clientes en tabla cliente, intentar desde persona (rol 2)
-// y mostrar aviso para que el admin sepa que debe registrar el vehículo
-// desde el panel del cliente o crear el registro en cliente
+// Si no hay clientes en tabla clientes, mostrar mensaje para que el admin registre clientes primero.
 if (empty($clientes)) {
-    $stmtCli2 = $db->query(
-        "SELECT p.id_persona AS id_cliente, p.nombre, p.correo, p.telefono
-         FROM persona p
-         WHERE p.id_rol = 2 AND p.activo = 1
-         ORDER BY p.nombre ASC"
-    );
-    $clientes = $stmtCli2->fetchAll(PDO::FETCH_ASSOC);
-    $clientesDesdePersona = true;
+    $clientesDesdePersona = false;
 } else {
     $clientesDesdePersona = false;
 }
@@ -105,77 +125,111 @@ $filtroActivo = $_GET['filtro'] ?? 'todos';
     </div>
 </div>
 
-<!-- ── Tabla ──────────────────────────────────────────────────────────────── -->
-<div class="card shadow-sm">
-    <div class="card-body p-0">
-        <div class="table-responsive">
-            <table class="table table-hover align-middle mb-0" id="tablaVehiculos">
-                <thead class="table-light">
-                    <tr>
-                        <th>PLACA</th>
-                        <th>VEHÍCULO</th>
-                        <th>CLIENTE</th>
-                        <th>ESTADO</th>
-                        <th>ACCIONES</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php foreach ($vehiculos as $v):
-                    $estado = $v['estado'] ?? '';
-                    $badge  = match(true) {
-                        stripos($estado, 'pendiente')    !== false => 'bg-warning text-dark',
-                        stripos($estado, 'reparaci')     !== false => 'bg-info text-dark',
-                        stripos($estado, 'finalizado')   !== false => 'bg-success',
-                        stripos($estado, 'pintura')      !== false => 'badge-pintura',
-                        stripos($estado, 'entregado')    !== false => 'bg-primary',
-                        default                                    => 'bg-secondary',
-                    };
-                ?>
-                <tr data-estado="<?= htmlspecialchars($estado) ?>">
-                    <td class="fw-bold font-monospace"><?= htmlspecialchars($v['placa']) ?></td>
-                    <td>
-                        <div class="fw-semibold"><?= htmlspecialchars($v['marca'] . ' ' . $v['modelo']) ?></div>
-                        <div class="text-muted small"><?= htmlspecialchars($v['año'] ?? '') ?></div>
-                    </td>
-                    <td>
-                        <div><?= htmlspecialchars($v['nombre_cliente'] ?? '–') ?></div>
-                        <div class="text-muted small"><?= htmlspecialchars($v['correo_cliente'] ?? '') ?></div>
-                    </td>
-                    <td><span class="badge <?= $badge ?>"><?= htmlspecialchars($estado) ?></span></td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-secondary me-1"
-                                title="Ver historial"
-                                onclick="verHistorial(<?= $v['id_vehiculo'] ?>, '<?= htmlspecialchars(addslashes($v['placa'])) ?>')">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-primary me-1"
-                                title="Editar vehículo"
-                                onclick="editarVehiculo(<?= htmlspecialchars(json_encode($v)) ?>)">
-                            <i class="fas fa-pencil"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-success me-1"
-                                title="Cambiar estado"
-                                onclick="cambiarEstado(<?= $v['id_vehiculo'] ?>, <?= $v['id_estado_vehiculo'] ?>)">
-                            <i class="fas fa-arrows-rotate"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-info"
-                                title="Agregar historial"
-                                onclick="abrirAgregarHistorial(<?= $v['id_vehiculo'] ?>, '<?= htmlspecialchars(addslashes($v['placa'])) ?>')">
-                            <i class="fas fa-plus-circle"></i>
-                        </button>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-                <?php if (empty($vehiculos)): ?>
-                    <tr id="sinResultados">
-                        <td colspan="5" class="text-center text-muted py-4">No hay vehículos registrados.</td>
-                    </tr>
-                <?php endif; ?>
-                </tbody>
-            </table>
+<!-- ── Tarjetas ─────────────────────────────────────────────────────────────── -->
+<div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-3" id="vehiculosCards">
+    <?php foreach ($vehiculos as $v):
+        $estado = $v['estado'] ?? '';
+        $badge  = match(true) {
+            stripos($estado, 'pendiente')    !== false => 'bg-warning text-dark',
+            stripos($estado, 'reparaci')     !== false => 'bg-info text-dark',
+            stripos($estado, 'finalizado')   !== false => 'bg-success',
+            stripos($estado, 'pintura')      !== false => 'badge-pintura',
+            stripos($estado, 'entregado')    !== false => 'bg-primary',
+            default                                    => 'bg-secondary',
+        };
+        $fechas   = $fechasMap[$v['id_vehiculo']] ?? null;
+        $entrada  = $fechas['fecha_entrada'] ?? null;
+        $salida   = $fechas['fecha_salida']  ?? null;
+        $search   = strtolower(trim($v['placa'] . ' ' . $v['marca'] . ' ' . $v['modelo'] . ' ' . ($v['nombre_cliente'] ?? '') . ' ' . ($v['correo_cliente'] ?? '') . ' ' . $estado));
+    ?>
+    <div class="col" data-estado="<?= htmlspecialchars($estado) ?>" data-search="<?= htmlspecialchars($search) ?>">
+        <div class="card shadow-sm h-100">
+            <?php $foto = $fotosMap[$v['id_vehiculo']] ?? null; ?>
+            <?php if ($foto): ?>
+                <div style="height: 200px; overflow: hidden; background-color: #f0f0f0;">
+                    <img src="../../public/uploads/vehiculos/<?= htmlspecialchars($foto['nombre_archivo']) ?>"
+                         alt="<?= htmlspecialchars($v['placa']) ?>"
+                         style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;"
+                         onclick="abrirFotos(<?= $v['id_vehiculo'] ?>, '<?= htmlspecialchars(addslashes($v['placa'])) ?>')">
+                </div>
+            <?php else: ?>
+                <div style="height: 200px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center;">
+                    <div class="text-center text-white">
+                        <i class="fas fa-car fa-3x mb-2 opacity-50"></i>
+                        <p class="small">Sin fotos</p>
+                    </div>
+                </div>
+            <?php endif; ?>
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="text-muted small">Placa</div>
+                        <div class="fw-bold text-uppercase"><?= htmlspecialchars($v['placa']) ?></div>
+                    </div>
+                    <span class="badge <?= $badge ?>"><?= htmlspecialchars($estado) ?></span>
+                </div>
+                <h5 class="card-title mb-1"><?= htmlspecialchars($v['marca'] . ' ' . $v['modelo']) ?></h5>
+                <p class="card-text text-muted small mb-3">Año: <?= htmlspecialchars($v['anio'] ?? '–') ?></p>
+                <div class="mb-3">
+                    <div class="fw-semibold">Cliente</div>
+                    <div class="small text-muted"><?= htmlspecialchars($v['nombre_cliente'] ?? '–') ?></div>
+                    <div class="small text-muted"><?= htmlspecialchars($v['correo_cliente'] ?? '–') ?></div>
+                </div>
+                <div class="mt-auto">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="text-muted small">Entrada</div>
+                            <div class="small"><?= $entrada ? date('d/m/Y', strtotime($entrada)) : '–' ?></div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-muted small">Salida</div>
+                            <div class="small">
+                                <?php if ($salida): ?>
+                                    <?= date('d/m/Y', strtotime($salida)) ?>
+                                <?php elseif ($entrada): ?>
+                                    <span class="badge bg-warning text-dark" style="font-size:.7rem;">En taller</span>
+                                <?php else: ?>
+                                    –
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-white border-top-0 pt-0">
+                <div class="d-flex flex-wrap gap-1">
+                    <button class="btn btn-sm btn-outline-secondary flex-grow-1"
+                            title="Ver historial"
+                            onclick="verHistorial(<?= $v['id_vehiculo'] ?>, '<?= htmlspecialchars(addslashes($v['placa'])) ?>')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary flex-grow-1"
+                            title="Editar vehículo"
+                            onclick="editarVehiculo(<?= htmlspecialchars(json_encode($v)) ?>)">
+                        <i class="fas fa-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-success flex-grow-1"
+                            title="Cambiar estado"
+                            onclick="cambiarEstado(<?= $v['id_vehiculo'] ?>, <?= $v['id_estado'] ?? 1 ?>)">
+                        <i class="fas fa-arrows-rotate"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-info flex-grow-1"
+                            title="Agregar historial"
+                            onclick="abrirAgregarHistorial(<?= $v['id_vehiculo'] ?>, '<?= htmlspecialchars(addslashes($v['placa'])) ?>')">
+                        <i class="fas fa-plus-circle"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning flex-grow-1"
+                            title="Fotos del vehículo"
+                            onclick="abrirFotos(<?= $v['id_vehiculo'] ?>, '<?= htmlspecialchars(addslashes($v['placa'])) ?>')">
+                        <i class="fas fa-camera"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
+    <?php endforeach; ?>
 </div>
+<div id="sinResultados" class="text-center text-muted py-4" style="display: none;">No hay vehículos registrados.</div>
 
 <!-- ════════════════════════════════════════════════════════════════════════════
      MODAL: REGISTRAR VEHÍCULO
@@ -368,8 +422,8 @@ $filtroActivo = $_GET['filtro'] ?? 'todos';
                             <select name="id_empleado_asignado" class="form-select" required>
                                 <option value="">Seleccionar empleado…</option>
                                 <?php foreach ($empleadosVeh as $e): ?>
-                                    <option value="<?= $e['id_persona'] ?>">
-                                        <?= htmlspecialchars($e['nombre']) ?>
+                                    <option value="<?= $e['id_usuario'] ?>">
+                                        <?= htmlspecialchars($e['nombres'] . ' ' . ($e['apellidos'] ?? '')) ?>
                                         <?= !empty($e['telefono']) ? ' · ' . htmlspecialchars($e['telefono']) : '' ?>
                                     </option>
                                 <?php endforeach; ?>
@@ -420,7 +474,7 @@ $filtroActivo = $_GET['filtro'] ?? 'todos';
         icon: '<?= htmlspecialchars($alert['icon']) ?>',
         title: '<?= htmlspecialchars($alert['title']) ?>',
         text: '<?= htmlspecialchars($alert['text']) ?>',
-        confirmButtonColor: '#2563eb'
+        confirmButtonColor: '#000000'
     });
 </script>
 <?php endif; ?>
@@ -447,12 +501,12 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
 function filtrarTabla() {
     const q = document.getElementById('buscador').value.toLowerCase();
     let visibles = 0;
-    document.querySelectorAll('#tablaVehiculos tbody tr[data-estado]').forEach(tr => {
-        const textoFila  = tr.textContent.toLowerCase();
-        const estadoFila = tr.dataset.estado;
-        const pasaBusq   = !q || textoFila.includes(q);
-        const pasaFiltro = filtroEstadoActivo === 'todos' || estadoFila === filtroEstadoActivo;
-        tr.style.display = (pasaBusq && pasaFiltro) ? '' : 'none';
+    document.querySelectorAll('#vehiculosCards .col[data-estado]').forEach(card => {
+        const textoCard  = card.dataset.search.toLowerCase();
+        const estadoCard = card.dataset.estado;
+        const pasaBusq   = !q || textoCard.includes(q);
+        const pasaFiltro = filtroEstadoActivo === 'todos' || estadoCard === filtroEstadoActivo;
+        card.style.display = (pasaBusq && pasaFiltro) ? '' : 'none';
         if (pasaBusq && pasaFiltro) visibles++;
     });
     const sinRes = document.getElementById('sinResultados');
@@ -465,7 +519,7 @@ function editarVehiculo(v) {
     document.getElementById('editPlaca').value  = v.placa;
     document.getElementById('editMarca').value  = v.marca;
     document.getElementById('editModelo').value = v.modelo;
-    document.getElementById('editAnio').value   = v['año'] ?? '';
+    document.getElementById('editAnio').value   = v['anio'] ?? '';
     document.getElementById('editEstado').value = v.id_estado_vehiculo ?? 1;
     new bootstrap.Modal(document.getElementById('modalEditar')).show();
 }
@@ -526,6 +580,176 @@ function escHtml(str) {
     if (!str) return '';
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+/* ── Fotos del vehículo ──────────────────────────────────────────────────── */
+function abrirFotos(idVehiculo, placa) {
+    document.getElementById('fotosIdVehiculo').value = idVehiculo;
+    document.getElementById('fotosPlaca').textContent = placa;
+    document.getElementById('previewContainer').innerHTML = '';
+    cargarGaleria(idVehiculo);
+    new bootstrap.Modal(document.getElementById('modalFotos')).show();
+}
+
+function cargarGaleria(idVehiculo) {
+    const galeria = document.getElementById('galeriaFotos');
+    galeria.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+
+    fetch('../../controllers/FotosAjaxController.php?id_vehiculo=' + idVehiculo)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.length) {
+                galeria.innerHTML = '<p class="text-muted text-center py-3"><i class="fas fa-images me-2 opacity-25"></i>No hay fotos para este vehículo.</p>';
+                return;
+            }
+
+            // Agrupar por etapa
+            const etapas = { antes: [], durante: [], despues: [] };
+            data.forEach(f => { if (etapas[f.etapa]) etapas[f.etapa].push(f); });
+
+            const etiquetas = { antes: '📷 Antes', durante: '🔧 Durante', despues: '✅ Después' };
+            let html = '';
+
+            Object.entries(etapas).forEach(([etapa, fotos]) => {
+                if (!fotos.length) return;
+                html += `<h6 class="fw-semibold mt-3 mb-2">${etiquetas[etapa]}</h6>`;
+                html += '<div class="row g-2">';
+                fotos.forEach(f => {
+                    html += `
+                    <div class="col-6 col-md-3 col-lg-2" id="foto-${f.id_foto}">
+                        <div class="card h-100 shadow-sm">
+                            <a href="../../public/uploads/vehiculos/${escHtml(f.nombre_archivo)}"
+                               target="_blank">
+                                <img src="../../public/uploads/vehiculos/${escHtml(f.nombre_archivo)}"
+                                     class="card-img-top"
+                                     style="height:110px;object-fit:cover;"
+                                     alt="${escHtml(f.descripcion || 'Foto')}">
+                            </a>
+                            <div class="card-body p-1">
+                                <p class="card-text" style="font-size:.7rem;color:#64748b;">
+                                    ${escHtml(f.descripcion || '')}
+                                </p>
+                                <p class="card-text" style="font-size:.65rem;color:#94a3b8;">
+                                    ${f.created_at ? f.created_at.substring(0,10) : ''}
+                                </p>
+                            </div>
+                            <div class="card-footer p-1 text-center">
+                                <button class="btn btn-sm btn-outline-danger w-100"
+                                        style="font-size:.7rem;"
+                                        onclick="eliminarFoto(${f.id_foto}, ${f.id_vehiculo})">
+                                    <i class="fas fa-trash me-1"></i>Eliminar
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+                html += '</div>';
+            });
+
+            galeria.innerHTML = html;
+        })
+        .catch(() => {
+            galeria.innerHTML = '<p class="text-danger text-center py-3">Error al cargar las fotos.</p>';
+        });
+}
+
+function eliminarFoto(idFoto, idVehiculo) {
+    Swal.fire({
+        icon: 'warning',
+        title: '¿Eliminar foto?',
+        text: 'Esta acción no se puede deshacer.',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+        confirmButtonColor: '#dc3545',
+        cancelButtonColor: '#6c757d'
+    }).then(result => {
+        if (result.isConfirmed) {
+            fetch('../../controllers/FotoVehiculoController.php?accion=eliminar&id=' + idFoto)
+                .then(() => cargarGaleria(idVehiculo));
+        }
+    });
+}
+
+function previsualizarFotos(input) {
+    const container = document.getElementById('previewContainer');
+    container.innerHTML = '';
+    Array.from(input.files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.style.cssText = 'width:80px;height:80px;object-fit:cover;border-radius:6px;border:2px solid #e2e8f0;';
+            container.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+    });
+}
 </script>
+
+<!-- ════════════════════════════════════════════════════════════════════════════
+     MODAL: FOTOS DEL VEHÍCULO
+════════════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalFotos" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content rounded-4">
+            <div class="modal-header" style="background:linear-gradient(90deg,#1a3a6b,#2563eb);">
+                <h5 class="modal-title text-white">
+                    <i class="fas fa-camera me-2"></i>Fotos — <span id="fotosPlaca"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- Subir nuevas fotos -->
+                <form action="../../controllers/FotoVehiculoController.php"
+                      method="POST" enctype="multipart/form-data" class="mb-4">
+                    <input type="hidden" name="accion" value="subir">
+                    <input type="hidden" name="id_vehiculo" id="fotosIdVehiculo">
+                    <div class="card border-dashed border-2 border-primary bg-light">
+                        <div class="card-body">
+                            <h6 class="fw-semibold mb-3">
+                                <i class="fas fa-upload text-primary me-2"></i>Subir nuevas fotos
+                            </h6>
+                            <div class="row g-3">
+                                <div class="col-sm-4">
+                                    <label class="form-label small fw-semibold">Etapa *</label>
+                                    <select name="etapa" class="form-select form-select-sm">
+                                        <option value="antes">📷 Antes del trabajo</option>
+                                        <option value="durante">🔧 Durante el trabajo</option>
+                                        <option value="despues">✅ Después del trabajo</option>
+                                    </select>
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="form-label small fw-semibold">Descripción</label>
+                                    <input type="text" name="descripcion" class="form-control form-control-sm"
+                                           placeholder="Ej: Daño en puerta izquierda">
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="form-label small fw-semibold">Imágenes * (máx. 5 MB c/u)</label>
+                                    <input type="file" name="fotos[]" class="form-control form-control-sm"
+                                           accept="image/*" multiple required
+                                           onchange="previsualizarFotos(this)">
+                                </div>
+                            </div>
+                            <!-- Previsualización -->
+                            <div id="previewContainer" class="d-flex flex-wrap gap-2 mt-3"></div>
+                            <button type="submit" class="btn btn-primary btn-sm mt-3">
+                                <i class="fas fa-upload me-1"></i> Subir Fotos
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Galería de fotos existentes -->
+                <div id="galeriaFotos">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>

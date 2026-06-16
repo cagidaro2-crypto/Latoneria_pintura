@@ -14,14 +14,14 @@ $alert = $_SESSION['alert'] ?? null; unset($_SESSION['alert']);
 
 // ── Ingresos totales (facturas pagadas) ───────────────────────────────────
 $totalIngresos = $db->query(
-    "SELECT COALESCE(SUM(total),0) FROM factura WHERE estado_pago='Pagada'"
+    "SELECT COALESCE(SUM(total),0) FROM facturas WHERE estado_pago='Pagada'"
 )->fetchColumn();
 
 // ── Total órdenes (historial_vehiculo como proxy) ─────────────────────────
 $totalOrdenes = $db->query("SELECT COUNT(*) FROM historial_vehiculo")->fetchColumn();
 
 // ── Total facturado ───────────────────────────────────────────────────────
-$totalVentas = $db->query("SELECT COALESCE(SUM(total),0) FROM factura")->fetchColumn();
+$totalVentas = $db->query("SELECT COALESCE(SUM(total),0) FROM facturas")->fetchColumn();
 
 // ── Servicios por tipo (desde historial_vehiculo) ─────────────────────────
 $stmtTipo = $db->query(
@@ -34,11 +34,11 @@ $serviciosPorTipo = $stmtTipo->fetchAll(PDO::FETCH_ASSOC);
 
 // ── Últimas facturas ──────────────────────────────────────────────────────
 $stmtFact = $db->query(
-    "SELECT f.*, cl.nombre AS cliente_nombre, v.placa
-     FROM factura f
-     JOIN cotizacion c  ON f.id_cotizacion = c.id_cotizacion
-     JOIN vehiculo v    ON c.id_vehiculo   = v.id_vehiculo
-     JOIN cliente  cl   ON v.id_cliente    = cl.id_cliente
+    "SELECT f.*, cl.nombres AS cliente_nombre, v.placa
+     FROM facturas f
+     JOIN cotizaciones c  ON f.id_cotizacion = c.id_cotizacion
+     JOIN vehiculos v    ON c.id_vehiculo   = v.id_vehiculo
+     JOIN clientes  cl   ON v.id_cliente    = cl.id_cliente
      ORDER BY f.fecha DESC
      LIMIT 10"
 );

@@ -18,25 +18,27 @@ $uModel = new Usuario($db);
 $alert  = $_SESSION['alert'] ?? null; unset($_SESSION['alert']);
 
 $ordenes   = $oModel->obtenerTodas();
-$clientes  = $uModel->obtenerTodos('cliente');
+$clientes  = $db->query(
+    "SELECT id_cliente, CONCAT(nombres, ' ', COALESCE(apellidos, '')) AS nombre_cliente
+     FROM clientes
+     ORDER BY nombres ASC"
+)->fetchAll(PDO::FETCH_ASSOC);
 
-// Empleados: todos los que tienen id_rol=3 en persona, con o sin registro en tabla empleado
+// Empleados: todos los usuarios con rol empleado
 $stmtEmp = $db->query(
-    "SELECT p.id_persona, p.nombre, p.telefono,
-            e.id_empleado
-     FROM persona p
-     LEFT JOIN empleado e ON e.id_persona = p.id_persona
-     WHERE p.id_rol = 3 AND p.activo = 1
-     ORDER BY p.nombre ASC"
+    "SELECT id_usuario, CONCAT(nombres, ' ', COALESCE(apellidos, '')) AS nombre, telefono
+     FROM usuarios
+     WHERE id_rol = 2
+     ORDER BY nombres ASC"
 );
 $empleados = $stmtEmp->fetchAll(PDO::FETCH_ASSOC);
 
-// Vehículos con nombre del dueño: vehiculo → cliente
+// Vehículos con nombre del dueño: vehiculos → clientes
 $stmtVeh = $db->query(
-    "SELECT v.id_vehiculo, v.placa, v.marca, v.modelo, v.`año`,
-            cl.nombre AS nombre_dueno
-     FROM vehiculo v
-     JOIN cliente cl ON v.id_cliente = cl.id_cliente
+    "SELECT v.id_vehiculo, v.placa, v.marca, v.modelo, v.anio,
+            CONCAT(c.nombres, ' ', COALESCE(c.apellidos, '')) AS nombre_dueno
+     FROM vehiculos v
+     JOIN clientes c ON v.id_cliente = c.id_cliente
      ORDER BY v.placa ASC"
 );
 $vehiculos = $stmtVeh->fetchAll(PDO::FETCH_ASSOC);
@@ -131,8 +133,8 @@ $vehiculos = $stmtVeh->fetchAll(PDO::FETCH_ASSOC);
                             <select name="id_cliente" class="form-select" required>
                                 <option value="">Seleccionar cliente…</option>
                                 <?php foreach ($clientes as $c): ?>
-                                    <option value="<?= $c['id_persona'] ?>">
-                                        <?= htmlspecialchars($c['nombre']) ?>
+                                    <option value="<?= $c['id_cliente'] ?>">
+                                        <?= htmlspecialchars($c['nombre_cliente']) ?>
                                     </option>
                                 <?php endforeach; ?>
                             </select>
@@ -153,7 +155,7 @@ $vehiculos = $stmtVeh->fetchAll(PDO::FETCH_ASSOC);
                             <select name="id_empleado" class="form-select">
                                 <option value="">— Sin asignar —</option>
                                 <?php foreach ($empleados as $e): ?>
-                                    <option value="<?= $e['id_persona'] ?>">
+                                    <option value="<?= $e['id_usuario'] ?>">
                                         <?= htmlspecialchars($e['nombre']) ?>
                                         <?= !empty($e['telefono']) ? ' · ' . htmlspecialchars($e['telefono']) : '' ?>
                                     </option>

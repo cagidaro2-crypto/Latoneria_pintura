@@ -23,11 +23,11 @@ try {
     $fin    = $_GET['end']   ?? null;
 
     $sql = "SELECT c.id_cita, c.numero_ref, c.tipo_servicio, c.fecha_cita, c.estado,
-                   p.nombre AS cliente_nombre,
+                   cl.nombres AS cliente_nombre,
                    v.placa
             FROM citas c
-            LEFT JOIN persona  p ON c.id_cliente  = p.id_persona
-            LEFT JOIN vehiculo v ON c.id_vehiculo = v.id_vehiculo
+            LEFT JOIN clientes cl ON c.id_cliente  = cl.id_cliente
+            LEFT JOIN vehiculos v ON c.id_vehiculo = v.id_vehiculo
             WHERE c.estado IN ('Pendiente', 'Confirmada')";
 
     $params = [];

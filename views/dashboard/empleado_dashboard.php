@@ -3,7 +3,7 @@ $titulo = 'Dashboard – Empleado';
 require_once __DIR__ . '/../../config/database.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
-if (!isset($_SESSION['usuario']) || (int)($_SESSION['usuario']['rol'] ?? 0) !== 3) {
+if (!isset($_SESSION['usuario']) || (int)($_SESSION['usuario']['rol'] ?? 0) !== 2) {
     header("Location: ../usuarios/login.php"); exit;
 }
 
@@ -18,7 +18,7 @@ $totalOrdenes = (int)$stmtTotal->fetchColumn();
 // Contar por estado del vehículo
 $stmtEst = $db->query(
     "SELECT ev.estado, COUNT(*) AS total
-     FROM vehiculo v
+     FROM vehiculos v
      JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
      GROUP BY ev.estado"
 );
@@ -36,17 +36,17 @@ foreach ($conteoEstados as $estado => $cnt) {
 
 // Últimas 8 órdenes (historial_vehiculo)
 $stmtOrd = $db->query(
-    "SELECT hv.id_historial_vehiculo AS id_orden,
+    "SELECT hv.id_historial AS id_orden,
             hv.descripcion,
             hv.fecha_registro,
             hv.tipo_reparacion,
             v.placa,
             v.marca,
-            cl.nombre AS cliente_nombre,
+            cl.nombres AS cliente_nombre,
             ev.estado
      FROM historial_vehiculo hv
-     JOIN vehiculo       v   ON hv.id_vehiculo = v.id_vehiculo
-     JOIN cliente        cl  ON v.id_cliente   = cl.id_cliente
+     JOIN vehiculos      v   ON hv.id_vehiculo = v.id_vehiculo
+     JOIN clientes       cl  ON v.id_cliente   = cl.id_cliente
      JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
      ORDER BY hv.fecha_registro DESC
      LIMIT 8"

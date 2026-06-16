@@ -12,7 +12,7 @@ require_once __DIR__ . '/../layouts/header.php';
 $db    = (new Database())->conectar();
 $alert = $_SESSION['alert'] ?? null; unset($_SESSION['alert']);
 
-$proveedores = $db->query("SELECT * FROM proveedor ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
+$proveedores = $db->query("SELECT * FROM proveedores ORDER BY nombre")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-4">

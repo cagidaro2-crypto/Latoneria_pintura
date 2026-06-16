@@ -8,7 +8,7 @@ if (!isset($_SESSION['usuario'])) {
 }
 
 $db        = (new Database())->conectar();
-$idPersona = (int)($_SESSION['usuario']['id_usuario'] ?? 0);
+$idUsuario = (int)($_SESSION['usuario']['id_usuario'] ?? 0);
 $accion    = $_POST['accion'] ?? ($_GET['accion'] ?? '');
 $destino   = '../views/dashboard/cliente_citas.php';
 
@@ -73,7 +73,7 @@ switch ($accion) {
                     (:ref, :id_cliente, :id_vehiculo, :tipo_servicio, :fecha_cita, 'Pendiente', NOW())"
             )->execute([
                 ':ref'          => $ref,
-                ':id_cliente'   => $idPersona,
+                ':id_cliente'   => $idUsuario,
                 ':id_vehiculo'  => $idVehiculo,
                 ':tipo_servicio'=> $tipoServicio,
                 ':fecha_cita'   => $fechaCita,
@@ -110,7 +110,7 @@ switch ($accion) {
                  WHERE id_cita = :id AND id_cliente = :cliente
                    AND estado IN ('Pendiente', 'Confirmada')"
             );
-            $stmt->execute([':id' => $idCita, ':cliente' => $idPersona]);
+            $stmt->execute([':id' => $idCita, ':cliente' => $idUsuario]);
 
             if ($stmt->rowCount() > 0) {
                 $_SESSION['alert'] = [
