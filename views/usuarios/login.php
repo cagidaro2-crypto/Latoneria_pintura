@@ -31,7 +31,7 @@ $abrirModal   = ($_GET['panel'] ?? '') === 'recuperar';
         }
 
         .auth-card {
-            max-width: 900px; 
+            max-width: 1100px; 
             width: 100%;
             border-radius: 20px; 
             overflow: hidden;
@@ -45,7 +45,7 @@ $abrirModal   = ($_GET['panel'] ?? '') === 'recuperar';
             background-image: url('../../public/img/car_login.png');
             background-size: cover;
             background-position: center;
-            min-height: 500px;
+            min-height: 560px;
         }
 
         .panel-left::before {

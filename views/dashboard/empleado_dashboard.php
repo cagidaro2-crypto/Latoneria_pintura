@@ -11,47 +11,48 @@ require_once __DIR__ . '/../layouts/header.php';
 
 $db = (new Database())->conectar();
 
-// Contadores desde historial_vehiculo (proxy de órdenes en esta BD)
-$stmtTotal = $db->query("SELECT COUNT(*) FROM historial_vehiculo");
-$totalOrdenes = (int)$stmtTotal->fetchColumn();
-
-// Contar por estado del vehículo
-$stmtEst = $db->query(
-    "SELECT ev.estado, COUNT(*) AS total
-     FROM vehiculos v
-     JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
-     GROUP BY ev.estado"
-);
-$conteoEstados = [];
-foreach ($stmtEst->fetchAll(PDO::FETCH_ASSOC) as $row) {
-    $conteoEstados[$row['estado']] = (int)$row['total'];
-}
-
+// Contadores
+$totalOrdenes = 0;
 $enReparacion = 0;
 $pendientes   = 0;
-foreach ($conteoEstados as $estado => $cnt) {
-    if (stripos($estado, 'reparaci') !== false) $enReparacion += $cnt;
-    if (stripos($estado, 'pendiente') !== false) $pendientes   += $cnt;
-}
 
-// Últimas 8 órdenes (historial_vehiculo)
-$stmtOrd = $db->query(
-    "SELECT hv.id_historial AS id_orden,
-            hv.descripcion,
-            hv.fecha_registro,
-            hv.tipo_reparacion,
-            v.placa,
-            v.marca,
-            cl.nombres AS cliente_nombre,
-            ev.estado
-     FROM historial_vehiculo hv
-     JOIN vehiculos      v   ON hv.id_vehiculo = v.id_vehiculo
-     JOIN clientes       cl  ON v.id_cliente   = cl.id_cliente
-     JOIN estado_vehiculo ev ON v.id_estado_vehiculo = ev.id_estado_vehiculo
-     ORDER BY hv.fecha_registro DESC
-     LIMIT 8"
-);
-$ordenes = $stmtOrd ? $stmtOrd->fetchAll(PDO::FETCH_ASSOC) : [];
+try {
+    $totalOrdenes = (int)$db->query("SELECT COUNT(*) FROM ordenes_trabajo")->fetchColumn();
+} catch (Exception $e) {}
+
+try {
+    $stmtEst = $db->query(
+        "SELECT ev.estado, COUNT(*) AS total
+         FROM vehiculos v
+         JOIN estado_vehiculo ev ON v.id_estado = ev.id_estado_vehiculo
+         GROUP BY ev.estado"
+    );
+    foreach ($stmtEst->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        if (stripos($row['estado'], 'reparaci')  !== false) $enReparacion += (int)$row['total'];
+        if (stripos($row['estado'], 'espera')     !== false) $pendientes   += (int)$row['total'];
+    }
+} catch (Exception $e) {}
+
+// Últimas 8 órdenes de trabajo
+$ordenes = [];
+try {
+    $stmtOrd = $db->query(
+        "SELECT ot.id_orden,
+                ot.descripcion_danos AS descripcion,
+                ot.fecha_ingreso     AS fecha_registro,
+                'Orden de trabajo'   AS tipo_reparacion,
+                v.placa, v.marca,
+                CONCAT(c.nombres,' ',COALESCE(c.apellidos,'')) AS cliente_nombre,
+                ev.estado
+         FROM ordenes_trabajo ot
+         JOIN vehiculos       v  ON ot.id_vehiculo = v.id_vehiculo
+         JOIN clientes        c  ON ot.id_cliente  = c.id_cliente
+         JOIN estado_vehiculo ev ON v.id_estado     = ev.id_estado_vehiculo
+         ORDER BY ot.fecha_ingreso DESC
+         LIMIT 8"
+    );
+    $ordenes = $stmtOrd ? $stmtOrd->fetchAll(PDO::FETCH_ASSOC) : [];
+} catch (Exception $e) {}
 ?>
 
 <!-- Tarjetas resumen -->
