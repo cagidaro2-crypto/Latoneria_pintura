@@ -2,13 +2,19 @@
 session_start();
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['usuario']) || (int)($_SESSION['usuario']['rol'] ?? 0) !== 1) {
+if (!isset($_SESSION['usuario']) || !in_array((int)($_SESSION['usuario']['rol'] ?? 0), [1, 2])) {
     header("Location: ../views/usuarios/login.php"); exit;
 }
 
 $db     = (new Database())->conectar();
 $accion = $_POST['accion'] ?? ($_GET['accion'] ?? '');
 $ruta   = '../views/dashboard/admin_inventario.php';
+
+// El empleado también puede descontar stock → redirigir a su vista
+$rolActual = (int)($_SESSION['usuario']['rol'] ?? 0);
+if ($rolActual === 2) {
+    $ruta = '../views/dashboard/empleado_inventario.php';
+}
 
 switch ($accion) {
 
@@ -118,6 +124,40 @@ switch ($accion) {
             }
 
             $_SESSION['alert'] = ['icon'=>'success','title'=>'Actualizado','text'=>'Stock actualizado correctamente.'];
+        } catch (Exception $e) {
+            $_SESSION['alert'] = ['icon'=>'error','title'=>'Error','text'=>$e->getMessage()];
+        }
+        header("Location: {$ruta}"); exit;
+
+    // ── DESCONTAR STOCK (empleado y admin) ──────────────────────────────────
+    case 'descontar':
+        $idInv    = (int)($_POST['id_inventario']       ?? 0);
+        $cantidad = (float)($_POST['cantidad_descontar'] ?? 0);
+        $motivo   = trim($_POST['motivo']               ?? '');
+
+        if ($idInv <= 0 || $cantidad <= 0) {
+            $_SESSION['alert'] = ['icon'=>'warning','title'=>'Datos inválidos','text'=>'Ingresa una cantidad mayor a 0.'];
+            header("Location: {$ruta}"); exit;
+        }
+
+        try {
+            // Verificar que no supere el stock disponible
+            $stmtCk = $db->prepare("SELECT cantidad FROM inventario WHERE id_inventario=:id");
+            $stmtCk->execute([':id' => $idInv]);
+            $stockActual = (float)($stmtCk->fetchColumn() ?: 0);
+
+            if ($cantidad > $stockActual) {
+                $_SESSION['alert'] = ['icon'=>'error','title'=>'Stock insuficiente',
+                    'text'=>"Solo hay {$stockActual} unidades disponibles."];
+                header("Location: {$ruta}"); exit;
+            }
+
+            $db->prepare(
+                "UPDATE inventario SET cantidad = cantidad - :cant WHERE id_inventario = :id"
+            )->execute([':cant' => $cantidad, ':id' => $idInv]);
+
+            $_SESSION['alert'] = ['icon'=>'success','title'=>'Stock descontado',
+                'text'=>"Se descontaron {$cantidad} unidad(es) correctamente." . ($motivo ? " Motivo: {$motivo}" : '')];
         } catch (Exception $e) {
             $_SESSION['alert'] = ['icon'=>'error','title'=>'Error','text'=>$e->getMessage()];
         }

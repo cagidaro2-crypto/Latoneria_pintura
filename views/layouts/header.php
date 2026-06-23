@@ -203,6 +203,7 @@ $paleta = [
             <a href="empleado_citas.php"     class="nav-link <?= $paginaActual==='empleado_citas.php'    ?'active':'' ?>"><i class="fas fa-calendar-check"></i> Citas</a>
             <a href="empleado_historial.php" class="nav-link <?= $paginaActual==='empleado_historial.php'?'active':'' ?>"><i class="fas fa-history"></i> Historial</a>
             <a href="empleado_ventas.php"    class="nav-link <?= $paginaActual==='empleado_ventas.php'   ?'active':'' ?>"><i class="fas fa-cart-shopping"></i> Ventas</a>
+            <a href="empleado_inventario.php" class="nav-link <?= $paginaActual==='empleado_inventario.php'?'active':'' ?>"><i class="fas fa-boxes-stacked"></i> Inventario</a>
         <?php endif; ?>
 
         <?php if ($rol === 'cliente'): ?>
