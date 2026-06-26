@@ -9,7 +9,7 @@ class Database
 
     public $conn;
 
-    public function conectar()
+    public function conexion()
     {
         $this->conn = null;
         try {
