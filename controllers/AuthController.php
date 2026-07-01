@@ -24,8 +24,8 @@ class AuthController
             header("Location: ../views/usuarios/login.php"); exit;
         }
 
-        $db      = (new Database())->conectar();
-        $model   = new Usuario($db);
+        $db     = (new Database())->conectar();
+        $model  = new Usuario($db);
         $usuario = $model->obtenerPorEmail($correo);
 
         if (!$usuario) {
